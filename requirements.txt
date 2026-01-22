@@ -1,0 +1,23 @@
+# Django Core
+Django>=5.0,<6.0
+djangorestframework>=3.14.0
+django-cors-headers>=4.3.0
+django-environ>=0.11.2
+
+# Database
+psycopg2-binary>=2.9.9
+dj-database-url>=2.1.0
+
+# AI & Content Extraction
+google-generativeai>=0.3.2
+youtube-transcript-api>=0.6.2
+beautifulsoup4>=4.12.2
+httpx>=0.26.0
+
+# Payments
+stripe>=7.8.0
+
+# Utilities
+python-dotenv>=1.0.0
+Pillow>=10.1.0
+gunicorn>=21.2.0
