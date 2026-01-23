@@ -82,7 +82,7 @@ TENANT_DOMAIN_MODEL = "tenants.Domain"  # app.Model
 SITE_ID = 1
 
 MIDDLEWARE = [
-    'django_tenants.middleware.main.TenantMainMiddleware',  # FIRST
+    'apps.tenants.middleware.HeaderTenantMiddleware',  # Custom middleware for Render/Vercel support
     'django.middleware.security.SecurityMiddleware',
     "whitenoise.middleware.WhiteNoiseMiddleware",  # Add Whitenoise for static files
     'corsheaders.middleware.CorsMiddleware',
