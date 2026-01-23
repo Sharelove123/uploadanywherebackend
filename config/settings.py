@@ -205,6 +205,20 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
     r'^https://.*\.vercel\.app$',  # Allow all Vercel subdomains (simplified)
 ]
 
+# Allow custom headers (including our X-Tenant-Domain header)
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+    'x-tenant-domain',  # Our custom header for tenant routing
+]
+
 # CSRF Settings
 if os.environ.get('CORS_ALLOWED_ORIGINS'):
     CSRF_TRUSTED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS').split(',')
