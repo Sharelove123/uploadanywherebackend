@@ -11,3 +11,6 @@ python manage.py migrate_schemas --shared
 
 # Migrate tenant schemas
 python manage.py migrate_schemas --tenant
+
+# Seed the public tenant with domains
+python manage.py seed_public_tenant
