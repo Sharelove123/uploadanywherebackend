@@ -140,13 +140,19 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 # Allauth Configuration
-ACCOUNT_AUTHENTICATION_METHOD = 'username_email'
-ACCOUNT_EMAIL_REQUIRED = True
-ACCOUNT_USERNAME_REQUIRED = True
-ACCOUNT_SIGNUP_FIELDS = {
-    'email': {'required': True},
-    'username': {'required': True},
-}
+# Allauth Configuration
+ACCOUNT_LOGIN_METHODS = {'email', 'username'}
+ACCOUNT_EMAIL_REQUIRED = True # kept for backward compat if needed or just remove, warnings say use SIGNUP_FIELDS
+# Actually warning says: settings.ACCOUNT_EMAIL_REQUIRED is deprecated, use: settings.ACCOUNT_SIGNUP_FIELDS = ['email', 'username']
+# Let's follow the warning exactly.
+
+ACCOUNT_EMAIL_VERIFICATION = 'optional'
+ACCOUNT_CONFIRM_EMAIL_ON_GET = True
+
+ACCOUNT_SIGNUP_FIELDS = [
+    'email',
+    'username',
+]
 
 
 # Internationalization
