@@ -35,7 +35,7 @@ class HeaderTenantMiddleware(TenantMainMiddleware):
             ).first()
             
             if public_domain:
-                return public_domain
+                return public_domain.tenant  # Return the tenant, not the domain!
             else:
                 # If no public domain exists at all, re-raise the original error
                 raise
