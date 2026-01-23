@@ -70,6 +70,7 @@ class ContentSourceSerializer(serializers.ModelSerializer):
 
 class ContentSourceListSerializer(serializers.ModelSerializer):
     """Lightweight serializer for listing content sources."""
+    repurposed_posts = RepurposedPostSerializer(many=True, read_only=True)
     source_type_display = serializers.CharField(source='get_source_type_display', read_only=True)
     posts_count = serializers.SerializerMethodField()
 
@@ -77,7 +78,7 @@ class ContentSourceListSerializer(serializers.ModelSerializer):
         model = ContentSource
         fields = [
             'id', 'source_type', 'source_type_display', 'source_url', 'title',
-            'is_processed', 'posts_count', 'created_at'
+            'is_processed', 'posts_count', 'created_at', 'repurposed_posts'
         ]
 
     def get_posts_count(self, obj) -> int:

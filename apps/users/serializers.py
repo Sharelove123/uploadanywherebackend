@@ -35,25 +35,41 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
 class UserProfileSerializer(serializers.ModelSerializer):
     """Serializer for user profile."""
+    pk = serializers.IntegerField(source='id', read_only=True)
     repurposes_remaining = serializers.SerializerMethodField()
-    subscription_display = serializers.CharField(source='get_subscription_tier_display', read_only=True)
+    subscription_tier = serializers.SerializerMethodField()
+    subscription_display = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = [
-            'id', 'email', 'username', 'first_name', 'last_name',
+            'pk', 'id', 'email', 'username', 'first_name', 'last_name',
             'avatar', 'bio', 'subscription_tier', 'subscription_display',
             'repurposes_used_this_month', 'repurposes_remaining',
             'created_at', 'updated_at'
         ]
         read_only_fields = [
-            'id', 'email', 'subscription_tier', 'repurposes_used_this_month',
+            'pk', 'id', 'email', 'subscription_tier', 'repurposes_used_this_month',
             'created_at', 'updated_at'
         ]
 
+    def get_subscription_tier(self, obj) -> str:
+        """Get subscription tier from the current tenant."""
+        from django.db import connection
+        tenant = getattr(connection, 'tenant', None)
+        if tenant:
+            return getattr(tenant, 'subscription_tier', 'free')
+        return 'free'
+
+    def get_subscription_display(self, obj) -> str:
+        """Get display name for subscription tier."""
+        tier = self.get_subscription_tier(obj)
+        return tier.capitalize()
+
     def get_repurposes_remaining(self, obj) -> int:
         from django.conf import settings
-        limits = settings.SUBSCRIPTION_LIMITS.get(obj.subscription_tier, {})
+        tier = self.get_subscription_tier(obj)
+        limits = settings.SUBSCRIPTION_LIMITS.get(tier, {})
         max_repurposes = limits.get('repurposes_per_month', 0)
         
         if max_repurposes == -1:

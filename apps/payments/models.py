@@ -39,6 +39,10 @@ class SubscriptionPlan(models.Model):
         return self.display_name
 
 
+
+
+
+
 class PaymentHistory(models.Model):
     """Record of all payments."""
     

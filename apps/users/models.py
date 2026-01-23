@@ -8,18 +8,7 @@ from django.db import models
 class CustomUser(AbstractUser):
     """Extended user model with subscription and usage tracking."""
     
-    class SubscriptionTier(models.TextChoices):
-        FREE = 'free', 'Free'
-        PRO = 'pro', 'Pro'
-        AGENCY = 'agency', 'Agency'
-    
-    subscription_tier = models.CharField(
-        max_length=20,
-        choices=SubscriptionTier.choices,
-        default=SubscriptionTier.FREE
-    )
-    stripe_customer_id = models.CharField(max_length=255, blank=True)
-    stripe_subscription_id = models.CharField(max_length=255, blank=True)
+    is_tenant_admin = models.BooleanField(default=False, help_text="Can manage tenant settings and members.")
     
     # Usage tracking (resets monthly)
     repurposes_used_this_month = models.PositiveIntegerField(default=0)
@@ -40,9 +29,15 @@ class CustomUser(AbstractUser):
         return self.email or self.username
     
     def can_repurpose(self) -> bool:
-        """Check if user has remaining repurposes this month."""
+        """Check if user has remaining repurposes this month (based on Tenant plan)."""
         from django.conf import settings
-        limits = settings.SUBSCRIPTION_LIMITS.get(self.subscription_tier, {})
+        from django.db import connection
+        
+        tenant = connection.tenant
+        # Default to 'free' if tenant has no subscription tier set
+        tier = getattr(tenant, 'subscription_tier', 'free')
+        
+        limits = settings.SUBSCRIPTION_LIMITS.get(tier, {})
         max_repurposes = limits.get('repurposes_per_month', 0)
         
         if max_repurposes == -1:  # Unlimited

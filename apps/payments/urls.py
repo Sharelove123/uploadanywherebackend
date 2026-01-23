@@ -1,15 +1,12 @@
-"""
-URL configuration for payments app.
-"""
+
 from django.urls import path
-# from . import views
+from .views import CreateCheckoutSessionView, SubscriptionPlansView
+from .webhooks import stripe_webhook
 
 app_name = 'payments'
 
-# TODO: Add payment views
 urlpatterns = [
-    # path('plans/', views.SubscriptionPlansView.as_view(), name='plans'),
-    # path('create-checkout/', views.CreateCheckoutView.as_view(), name='create-checkout'),
-    # path('webhook/', views.StripeWebhookView.as_view(), name='webhook'),
-    # path('history/', views.PaymentHistoryView.as_view(), name='history'),
+    path('plans/', SubscriptionPlansView.as_view(), name='subscription-plans'),
+    path('create-checkout-session/', CreateCheckoutSessionView.as_view(), name='create-checkout-session'),
+    path('webhook/', stripe_webhook, name='stripe-webhook'),
 ]

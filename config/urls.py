@@ -10,6 +10,11 @@ from rest_framework.response import Response
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
+def home(request):
+    return Response({'message': 'Content Repurposer Backend is Running!', 'status': 'ok'})
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
 def api_root(request):
     """API root endpoint with available routes."""
     return Response({
@@ -33,6 +38,9 @@ def api_root(request):
 
 
 urlpatterns = [
+    # root
+    path('', home, name='home'),
+    
     # Admin
     path('admin/', admin.site.urls),
     
