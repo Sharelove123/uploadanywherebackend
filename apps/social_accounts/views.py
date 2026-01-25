@@ -116,7 +116,7 @@ class SocialConnectView(views.APIView):
             'auth_endpoint': 'https://www.facebook.com/v21.0/dialog/oauth',
             'client_id': settings.FACEBOOK_APP_ID,
             'redirect_uri': f"{frontend_base}/callback/instagram",
-            'scope': 'instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement',
+            'scope': 'instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement,business_management',
         }
 
 
