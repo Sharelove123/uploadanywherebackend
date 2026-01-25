@@ -6,9 +6,9 @@ pip install -r requirements.txt
 
 python manage.py collectstatic --no-input
 
+# Run migrations (Render connects DB during build if using PostgreSQL)
+python manage.py makemigrations --noinput || true
+python manage.py migrate --noinput
+
 # Auto-create superuser from environment variables (if not exists)
 python manage.py createsuperuser --noinput || true
-
-# NOTE: Database migrations should NOT run in the build step on Render/Heroku
-# because the database is often not accessible during the build phase.
-# We will run them in the Start Command or entrypoint.
