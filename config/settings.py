@@ -381,3 +381,27 @@ LOGGING = {
         },
     },
 } 
+
+# ==============================================================================
+# SUBSCRIPTION LIMITS (Used for credit tracking)
+# ==============================================================================
+SUBSCRIPTION_LIMITS = {
+    'free': {
+        'repurposes_per_month': 5,
+        'brand_voices_limit': 1,
+        'direct_posting': False,
+        'priority_support': False,
+    },
+    'pro': {
+        'repurposes_per_month': 50,
+        'brand_voices_limit': 5,
+        'direct_posting': True,
+        'priority_support': False,
+    },
+    'agency': {
+        'repurposes_per_month': -1,  # Unlimited
+        'brand_voices_limit': -1,    # Unlimited
+        'direct_posting': True,
+        'priority_support': True,
+    },
+}
