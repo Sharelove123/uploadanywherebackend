@@ -119,45 +119,4 @@ class TenantLookupView(APIView):
             return Response({'found': False, 'message': 'No tenant mapping found.'}, status=status.HTTP_200_OK)
 
 
-class FixMeView(APIView):
-    """Temporary view to fix subscription status across ALL tenants."""
-    permission_classes = [permissions.IsAuthenticated]
 
-    def get(self, request):
-        from django_tenants.utils import get_tenant_model, schema_context
-        from django.contrib.auth import get_user_model
-        
-        Tenant = get_tenant_model()
-        User = get_user_model()
-        email = request.user.email
-        results = []
-        
-        # 1. Update in Public
-        try:
-            with schema_context('public'):
-                user = User.objects.get(email=email)
-                user.subscription_tier = 'pro'
-                user.save()
-                results.append(f"Public: Updated")
-        except User.DoesNotExist:
-            results.append(f"Public: User not found")
-
-        # 2. Update in all Tenants
-        tenants = Tenant.objects.exclude(schema_name='public')
-        for tenant in tenants:
-            try:
-                with schema_context(tenant.schema_name):
-                    user = User.objects.filter(email=email).first()
-                    if user:
-                        user.subscription_tier = 'pro'
-                        user.save()
-                        results.append(f"{tenant.schema_name}: Updated")
-                    else:
-                        results.append(f"{tenant.schema_name}: User not found")
-            except Exception as e:
-                results.append(f"{tenant.schema_name}: Error {str(e)}")
-
-        return Response({
-            'message': f'Ran fix for {email}',
-            'results': results
-        })

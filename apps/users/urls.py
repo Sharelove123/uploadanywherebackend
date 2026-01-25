@@ -12,6 +12,4 @@ urlpatterns = [
     path('change-password/', views.ChangePasswordView.as_view(), name='change-password'),
     path('usage/', views.UsageStatsView.as_view(), name='usage-stats'),
     path('tenant-lookup/', views.TenantLookupView.as_view(), name='tenant-lookup'),
-    # Temporary Fix Endpoint
-    path('fix-me/', views.FixMeView.as_view(), name='fix-me'),
 ]
