@@ -301,3 +301,38 @@ class SocialMediaService:
                 'success': False,
                 'error': f"Publishing failed: {pub_res.text}"
             }
+
+    @staticmethod
+    def post_to_facebook(page_access_token, page_id, message, image_url=None):
+        """
+        Post to Facebook Page feed.
+        Uses Page Access Token (not User Token).
+        """
+        url = f"https://graph.facebook.com/v21.0/{page_id}/feed"
+        
+        payload = {
+            'message': message,
+            'access_token': page_access_token
+        }
+        
+        # If image URL provided, post as photo instead
+        if image_url:
+            url = f"https://graph.facebook.com/v21.0/{page_id}/photos"
+            payload['url'] = image_url
+        
+        response = requests.post(url, data=payload)
+        
+        if response.status_code == 200:
+            data = response.json()
+            post_id = data.get('id') or data.get('post_id')
+            return {
+                'success': True,
+                'id': post_id,
+                'url': f"https://www.facebook.com/{post_id}"
+            }
+        else:
+            logger.error(f"Facebook posting failed: {response.text}")
+            return {
+                'success': False,
+                'error': response.text
+            }

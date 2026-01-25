@@ -40,6 +40,8 @@ class SocialConnectView(views.APIView):
             config = self._get_youtube_config(frontend_base)
         elif platform == 'instagram':
             config = self._get_instagram_config(frontend_base)
+        elif platform == 'facebook':
+            config = self._get_facebook_config(frontend_base)
         else:
             return Response({'error': 'Unsupported platform'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -119,6 +121,14 @@ class SocialConnectView(views.APIView):
             'scope': 'instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement,business_management',
         }
 
+    def _get_facebook_config(self, frontend_base):
+        return {
+            'auth_endpoint': 'https://www.facebook.com/v21.0/dialog/oauth',
+            'client_id': settings.FACEBOOK_APP_ID,
+            'redirect_uri': f"{frontend_base}/callback/facebook",
+            'scope': 'pages_show_list,pages_manage_posts,pages_read_engagement,business_management',
+        }
+
 
 class SocialCallbackView(views.APIView):
     """
@@ -159,6 +169,8 @@ class SocialCallbackView(views.APIView):
             token_data = self._exchange_youtube_token(code, redirect_uri)
         elif platform == 'instagram':
             token_data = self._exchange_instagram_token(code, redirect_uri)
+        elif platform == 'facebook':
+            token_data = self._exchange_facebook_token(code, redirect_uri)
         else:
             return Response({'error': 'Unsupported platform'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -208,6 +220,16 @@ class SocialCallbackView(views.APIView):
                 # Simplest MVP: Store User Token (Long-lived)
             else:
                 return Response({'error': 'No Instagram Business Account linked to this Facebook account.'}, status=status.HTTP_400_BAD_REQUEST)
+        elif platform == 'facebook':
+            # Get Page info and Page Access Token for posting
+            page_info = self._get_facebook_page_info(token_data.get('access_token'))
+            if page_info and 'page_id' in page_info:
+                platform_user_id = page_info['page_id']
+                platform_username = page_info['page_name']
+                # Store the PAGE access token (not user token) for posting
+                token_data['access_token'] = page_info['page_access_token']
+            else:
+                return Response({'error': 'No Facebook Page found for this account.'}, status=status.HTTP_400_BAD_REQUEST)
 
         # Save account
         from django.utils import timezone
@@ -361,6 +383,53 @@ class SocialCallbackView(views.APIView):
                         'username': page['instagram_business_account']['username'],
                         'page_name': page['name']
                     }
+        return None
+
+    def _exchange_facebook_token(self, code, redirect_uri):
+        # Same as Instagram - uses Facebook OAuth
+        url = "https://graph.facebook.com/v21.0/oauth/access_token"
+        params = {
+            'client_id': settings.FACEBOOK_APP_ID,
+            'redirect_uri': redirect_uri,
+            'client_secret': settings.FACEBOOK_APP_SECRET,
+            'code': code
+        }
+        response = requests.get(url, params=params)
+        data = response.json()
+        
+        if 'access_token' in data:
+            # Exchange for Long-Lived Token
+            ll_url = "https://graph.facebook.com/v21.0/oauth/access_token"
+            ll_params = {
+                'grant_type': 'fb_exchange_token',
+                'client_id': settings.FACEBOOK_APP_ID,
+                'client_secret': settings.FACEBOOK_APP_SECRET,
+                'fb_exchange_token': data['access_token']
+            }
+            ll_res = requests.get(ll_url, params=ll_params)
+            ll_data = ll_res.json()
+            if 'access_token' in ll_data:
+                data['access_token'] = ll_data['access_token']
+                data['expires_in'] = ll_data.get('expires_in')
+        
+        return data
+
+    def _get_facebook_page_info(self, access_token):
+        # Get Facebook Pages with their access tokens
+        url = "https://graph.facebook.com/v21.0/me/accounts?fields=id,name,access_token"
+        response = requests.get(url, params={'access_token': access_token})
+        data = response.json()
+        
+        print(f"DEBUG: Facebook Pages for posting: {data}")
+
+        if 'data' in data and len(data['data']) > 0:
+            # Return first page (user can have multiple, but MVP uses first)
+            page = data['data'][0]
+            return {
+                'page_id': page['id'],
+                'page_name': page['name'],
+                'page_access_token': page['access_token']
+            }
         return None
 
 

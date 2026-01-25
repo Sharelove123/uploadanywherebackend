@@ -14,6 +14,7 @@ class SocialAccount(models.Model):
         TWITTER = 'twitter', 'X (Twitter)'
         INSTAGRAM = 'instagram', 'Instagram'
         YOUTUBE = 'youtube', 'YouTube'
+        FACEBOOK = 'facebook', 'Facebook'
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,

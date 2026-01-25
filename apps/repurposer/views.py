@@ -120,6 +120,18 @@ class RepurposedPostViewSet(viewsets.ModelViewSet):
                 caption=post.generated_content,
                 image_url=image_url
             )
+        elif post.platform == SocialAccount.Platform.FACEBOOK:
+            # Facebook Page posting - uses Page Access Token stored during connection
+            image_url = None
+            if post.media_file:
+                image_url = request.build_absolute_uri(post.media_file.url)
+            
+            result = SocialMediaService.post_to_facebook(
+                account.access_token,  # This is the Page Access Token
+                account.platform_user_id,  # This is the Page ID
+                message=post.generated_content,
+                image_url=image_url
+            )
             
         # 3. Handle Result
         if result['success']:
