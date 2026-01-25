@@ -115,5 +115,13 @@ class TenantLookupView(APIView):
                     'tenant_name': mapping.tenant.name,
                     'tenant_domain': primary_domain.domain
                 })
-        except UserTenantMap.DoesNotExist:
-            return Response({'found': False, 'message': 'No tenant mapping found.'}, status=status.HTTP_200_OK)
+
+class FixMeView(APIView):
+    """Temporary view to fix subscription status."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        user.subscription_tier = 'pro'
+        user.save()
+        return Response({'message': f'Updated {user.email} to PRO tier!'})
