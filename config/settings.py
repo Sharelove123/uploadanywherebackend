@@ -235,10 +235,13 @@ else:
         'http://*.lvh.me:3000',
         'http://lvh.me:3000',
     ]
-CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SAMESITE = 'None'
 CSRF_COOKIE_HTTPONLY = False  # Allow JS to read for AJAX
+CSRF_COOKIE_SECURE = True
 CSRF_COOKIE_DOMAIN = os.environ.get('COOKIE_DOMAIN', None)
 SESSION_COOKIE_DOMAIN = os.environ.get('COOKIE_DOMAIN', None)
+SESSION_COOKIE_SAMESITE = 'None'
+SESSION_COOKIE_SECURE = True
 
 
 
