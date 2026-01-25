@@ -237,8 +237,8 @@ else:
     ]
 CSRF_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_HTTPONLY = False  # Allow JS to read for AJAX
-CSRF_COOKIE_DOMAIN = '.lvh.me'
-SESSION_COOKIE_DOMAIN = '.lvh.me'
+CSRF_COOKIE_DOMAIN = os.environ.get('COOKIE_DOMAIN', None)
+SESSION_COOKIE_DOMAIN = os.environ.get('COOKIE_DOMAIN', None)
 
 
 
