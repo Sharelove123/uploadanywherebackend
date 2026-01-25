@@ -324,6 +324,10 @@ class SocialCallbackView(views.APIView):
             perm_res = requests.get(perm_url, params={'access_token': data['access_token']})
             print(f"DEBUG: Granted Permissions: {perm_res.json()}")
 
+            # DEBUG: Check WHO we are logged in as
+            user_res = requests.get("https://graph.facebook.com/v18.0/me", params={'access_token': data['access_token']})
+            print(f"DEBUG: Connected Facebook User: {user_res.json()}")
+
             # 2. Exchange for Long-Lived Token (Required for offline access effectively)
             ll_url = "https://graph.facebook.com/v18.0/oauth/access_token"
             ll_params = {
