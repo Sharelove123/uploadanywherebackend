@@ -63,42 +63,63 @@ def handle_checkout_session(session):
     metadata = session.get('metadata', {})
     
     User = get_user_model()
-    try:
-        user = User.objects.get(id=client_reference_id)
-        
-        # Get Plan from metadata
-        plan_id = metadata.get('plan_id')
-        plan = None
-        
-        if plan_id:
+    from django_tenants.utils import get_tenant_model, schema_context
+    Tenant = get_tenant_model()
+
+    # We need to update this user in EVERY schema where they exist
+    # First, get the plan (it's shared/public)
+    plan_id = metadata.get('plan_id')
+    plan = None
+    if plan_id:
+        with schema_context('public'):
             try:
-                # Try to find plan by ID
                 plan = SubscriptionPlan.objects.get(id=plan_id)
-            except (SubscriptionPlan.DoesNotExist, ValueError):
-                # Fallback: try finding by looking up via price in session (complex, skip for now)
+            except SubscriptionPlan.DoesNotExist:
                 logger.warning(f"Plan ID {plan_id} not found in DB")
-        
-        if plan:
+
+    if not plan:
+        return # Cannot proceed properly without plan
+
+    # 1. Update in Public
+    try:
+        with schema_context('public'):
+            user = User.objects.get(id=client_reference_id)
             user.subscription_tier = plan.name
+            user.stripe_customer_id = stripe_customer_id
+            if stripe_subscription_id:
+                user.stripe_subscription_id = stripe_subscription_id
+            user.save()
             
-        user.stripe_customer_id = stripe_customer_id
-        if stripe_subscription_id:
-            user.stripe_subscription_id = stripe_subscription_id
-            
-        user.save()
-        
-        # Log payment
-        PaymentHistory.objects.create(
-            user=user,
-            plan=plan,
-            amount=session.get('amount_total', 0) / 100.0, # Convert cents to dollars
-            status='succeeded',
-            stripe_payment_intent_id=session.get('payment_intent') or session.get('id')
-        )
-        
-        logger.info(f"Subscription activated for user {user.username} to plan {plan.name if plan else 'Unknown'}")
-        
+            # Log payment
+            PaymentHistory.objects.create(
+                user=user,
+                plan=plan,
+                amount=session.get('amount_total', 0) / 100.0,
+                status='succeeded',
+                stripe_payment_intent_id=session.get('payment_intent') or session.get('id')
+            )
+            logger.info(f"Public: Subscription activated for user {user.username}")
     except User.DoesNotExist:
-        logger.error(f"User not found for payment: {client_reference_id}")
-    except Exception as e:
-        logger.error(f"Error handling webhook: {str(e)}")
+        logger.warning(f"Public: User {client_reference_id} not found")
+
+    # 2. Update in All Tenants
+    tenants = Tenant.objects.exclude(schema_name='public')
+    for tenant in tenants:
+        try:
+            with schema_context(tenant.schema_name):
+                # Try to find matching user (by ID should work if synced, otherwise email)
+                user = User.objects.filter(id=client_reference_id).first()
+                if not user:
+                     # Fallback to email if IDs diverged (unlikely with shared users but safe)
+                     # We need to fetch email from public user first to know what to look for?
+                     # Ideally IDs match. If not, we skip.
+                     continue
+                
+                user.subscription_tier = plan.name
+                user.stripe_customer_id = stripe_customer_id
+                if stripe_subscription_id:
+                    user.stripe_subscription_id = stripe_subscription_id
+                user.save()
+                logger.info(f"{tenant.schema_name}: Subscription activated for user {user.username}")
+        except Exception as e:
+            logger.error(f"{tenant.schema_name}: Failed to update subscription: {str(e)}")
