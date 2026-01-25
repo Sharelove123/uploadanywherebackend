@@ -76,6 +76,7 @@ class RepurposedPost(models.Model):
         INSTAGRAM = 'instagram', 'Instagram'
         YOUTUBE = 'youtube', 'YouTube Community'
         NEWSLETTER = 'newsletter', 'Newsletter'
+        FACEBOOK = 'facebook', 'Facebook'
 
     class Status(models.TextChoices):
         PENDING = 'pending', 'Pending'
