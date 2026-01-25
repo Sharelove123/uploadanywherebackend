@@ -113,7 +113,7 @@ class SocialConnectView(views.APIView):
 
     def _get_instagram_config(self, frontend_base):
         return {
-            'auth_endpoint': 'https://www.facebook.com/v18.0/dialog/oauth',
+            'auth_endpoint': 'https://www.facebook.com/v21.0/dialog/oauth',
             'client_id': settings.FACEBOOK_APP_ID,
             'redirect_uri': f"{frontend_base}/callback/instagram",
             'scope': 'instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement',
@@ -308,7 +308,7 @@ class SocialCallbackView(views.APIView):
 
     def _exchange_instagram_token(self, code, redirect_uri):
         # 1. Exchange Access Token
-        url = "https://graph.facebook.com/v18.0/oauth/access_token"
+        url = "https://graph.facebook.com/v21.0/oauth/access_token"
         params = {
             'client_id': settings.FACEBOOK_APP_ID,
             'redirect_uri': redirect_uri,
@@ -320,16 +320,16 @@ class SocialCallbackView(views.APIView):
         
         if 'access_token' in data:
             # DEBUG: Check what permissions were actually granted
-            perm_url = "https://graph.facebook.com/v18.0/me/permissions"
+            perm_url = "https://graph.facebook.com/v21.0/me/permissions"
             perm_res = requests.get(perm_url, params={'access_token': data['access_token']})
             print(f"DEBUG: Granted Permissions: {perm_res.json()}")
 
             # DEBUG: Check WHO we are logged in as
-            user_res = requests.get("https://graph.facebook.com/v18.0/me", params={'access_token': data['access_token']})
+            user_res = requests.get("https://graph.facebook.com/v21.0/me", params={'access_token': data['access_token']})
             print(f"DEBUG: Connected Facebook User: {user_res.json()}")
 
             # 2. Exchange for Long-Lived Token (Required for offline access effectively)
-            ll_url = "https://graph.facebook.com/v18.0/oauth/access_token"
+            ll_url = "https://graph.facebook.com/v21.0/oauth/access_token"
             ll_params = {
                 'grant_type': 'fb_exchange_token',
                 'client_id': settings.FACEBOOK_APP_ID,
@@ -346,7 +346,7 @@ class SocialCallbackView(views.APIView):
 
     def _get_instagram_account_info(self, access_token):
         # Find IG Business Account connected to Facebook Pages
-        url = "https://graph.facebook.com/v18.0/me/accounts?fields=instagram_business_account{id,username},name"
+        url = "https://graph.facebook.com/v21.0/me/accounts?fields=instagram_business_account{id,username},name"
         response = requests.get(url, params={'access_token': access_token})
         data = response.json()
         
