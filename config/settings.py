@@ -312,7 +312,7 @@ TWITTER_CLIENT_SECRET = os.environ.get('TWITTER_CLIENT_SECRET', '')
 
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
 GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '')
-GOOGLE_REDIRECT_URI = os.environ.get('GOOGLE_REDIRECT_URI', 'http://localhost:3000/callback/youtube')
+GOOGLE_REDIRECT_URI = os.environ.get('GOOGLE_REDIRECT_URI', f"{FRONTEND_URL}/callback/youtube")
 
 FACEBOOK_APP_ID = os.environ.get('FACEBOOK_APP_ID', '')
 FACEBOOK_APP_SECRET = os.environ.get('FACEBOOK_APP_SECRET', '')
