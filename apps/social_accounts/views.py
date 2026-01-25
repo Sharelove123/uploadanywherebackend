@@ -341,8 +341,11 @@ class SocialCallbackView(views.APIView):
         response = requests.get(url, params={'access_token': access_token})
         data = response.json()
         
+        print(f"DEBUG: Facebook Pages Response: {data}") # Debug log
+
         if 'data' in data:
             for page in data['data']:
+                print(f"DEBUG: Checking Page: {page.get('name')} - IG: {page.get('instagram_business_account')}")
                 if 'instagram_business_account' in page:
                     return {
                         'ig_id': page['instagram_business_account']['id'],
