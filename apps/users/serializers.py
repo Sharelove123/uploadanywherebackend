@@ -54,12 +54,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
         ]
 
     def get_subscription_tier(self, obj) -> str:
-        """Get subscription tier from the current tenant."""
-        from django.db import connection
-        tenant = getattr(connection, 'tenant', None)
-        if tenant:
-            return getattr(tenant, 'subscription_tier', 'free')
-        return 'free'
+        """Get subscription tier from user."""
+        return obj.subscription_tier or 'free'
 
     def get_subscription_display(self, obj) -> str:
         """Get display name for subscription tier."""

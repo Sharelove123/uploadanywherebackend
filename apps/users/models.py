@@ -10,6 +10,11 @@ class CustomUser(AbstractUser):
     
     is_tenant_admin = models.BooleanField(default=False, help_text="Can manage tenant settings and members.")
     
+    # Subscription tracking
+    subscription_tier = models.CharField(max_length=20, default='free', help_text="Current subscription plan")
+    stripe_customer_id = models.CharField(max_length=255, blank=True, help_text="Stripe Customer ID")
+    stripe_subscription_id = models.CharField(max_length=255, blank=True, help_text="Stripe Subscription ID")
+    
     # Usage tracking (resets monthly)
     repurposes_used_this_month = models.PositiveIntegerField(default=0)
     usage_reset_date = models.DateField(null=True, blank=True)
@@ -29,13 +34,11 @@ class CustomUser(AbstractUser):
         return self.email or self.username
     
     def can_repurpose(self) -> bool:
-        """Check if user has remaining repurposes this month (based on Tenant plan)."""
+        """Check if user has remaining repurposes this month."""
         from django.conf import settings
-        from django.db import connection
         
-        tenant = connection.tenant
-        # Default to 'free' if tenant has no subscription tier set
-        tier = getattr(tenant, 'subscription_tier', 'free')
+        # Use user's subscription tier
+        tier = self.subscription_tier or 'free'
         
         limits = settings.SUBSCRIPTION_LIMITS.get(tier, {})
         max_repurposes = limits.get('repurposes_per_month', 0)
