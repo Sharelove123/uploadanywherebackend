@@ -48,5 +48,12 @@ class ClientSerializer(serializers.ModelSerializer):
                 is_superuser=True,    # Full permissions
                 is_tenant_admin=True  # Custom flag if you have it
             )
+
+        # 4. Create UserTenantMap in PUBLIC schema
+        from .models import UserTenantMap
+        UserTenantMap.objects.create(
+            email=owner_email,
+            tenant=client
+        )
         
         return client

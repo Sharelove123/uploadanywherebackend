@@ -82,11 +82,11 @@ TENANT_DOMAIN_MODEL = "tenants.Domain"  # app.Model
 SITE_ID = 1
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'apps.tenants.middleware.HeaderTenantMiddleware',  # Custom middleware for Render/Vercel support
     'django.middleware.security.SecurityMiddleware',
     "whitenoise.middleware.WhiteNoiseMiddleware",  # Add Whitenoise for static files
-    'corsheaders.middleware.CorsMiddleware',
-
+    
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -166,6 +166,10 @@ USE_TZ = True
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
+# Media files
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -198,10 +202,12 @@ else:
     CORS_ALLOWED_ORIGINS = [
         'http://localhost:3000',
         'http://127.0.0.1:3000',
+        'http://lvh.me:3000',
     ]
 
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r'^http://.*\.localhost:3000$',
+    r'^http://.*\.lvh\.me:3000$',  # Allow all lvh.me subdomains
     r'^https://.*\.vercel\.app$',  # Allow all Vercel subdomains (simplified)
 ]
 
@@ -227,9 +233,13 @@ else:
         'http://localhost:3000',
         'http://127.0.0.1:3000',
         'http://*.localhost:3000',
+        'http://*.lvh.me:3000',
+        'http://lvh.me:3000',
     ]
 CSRF_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_HTTPONLY = False  # Allow JS to read for AJAX
+CSRF_COOKIE_DOMAIN = '.lvh.me'
+SESSION_COOKIE_DOMAIN = '.lvh.me'
 
 
 
@@ -295,6 +305,16 @@ LINKEDIN_REDIRECT_URI = os.environ.get('LINKEDIN_REDIRECT_URI', 'http://localhos
 TWITTER_API_KEY = os.environ.get('TWITTER_API_KEY', '')
 TWITTER_API_SECRET = os.environ.get('TWITTER_API_SECRET', '')
 TWITTER_REDIRECT_URI = os.environ.get('TWITTER_REDIRECT_URI', 'http://localhost:3000/callback/twitter')
+TWITTER_CLIENT_ID = os.environ.get('TWITTER_CLIENT_ID', '')
+TWITTER_CLIENT_SECRET = os.environ.get('TWITTER_CLIENT_SECRET', '')
+
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
+GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '')
+GOOGLE_REDIRECT_URI = os.environ.get('GOOGLE_REDIRECT_URI', 'http://localhost:3000/callback/youtube')
+
+FACEBOOK_APP_ID = os.environ.get('FACEBOOK_APP_ID', '')
+FACEBOOK_APP_SECRET = os.environ.get('FACEBOOK_APP_SECRET', '')
+FACEBOOK_REDIRECT_URI = os.environ.get('FACEBOOK_REDIRECT_URI', 'http://localhost:3000/callback/instagram')
 
 
 # ==============================================================================

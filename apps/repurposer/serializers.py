@@ -34,7 +34,7 @@ class RepurposedPostSerializer(serializers.ModelSerializer):
             'generated_content', 'hook', 'hashtags', 'thread_posts',
             'status', 'status_display', 'error_message',
             'scheduled_for', 'published_at', 'platform_post_url',
-            'content_preview', 'is_thread',
+            'content_preview', 'is_thread', 'media_file',
             'created_at', 'updated_at'
         ]
         read_only_fields = [
@@ -116,5 +116,5 @@ class RepurposeRequestSerializer(serializers.Serializer):
 
 class PublishPostSerializer(serializers.Serializer):
     """Serializer for publishing a post."""
-    social_account_id = serializers.IntegerField(required=True)
+    social_account_id = serializers.IntegerField(required=False)
     schedule_for = serializers.DateTimeField(required=False, allow_null=True)

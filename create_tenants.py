@@ -33,6 +33,11 @@ def create_tenants():
         domain.tenant = test_tenant
         domain.is_primary = True
         domain.save()
+        
+        # Create map for default admin user
+        from apps.tenants.models import UserTenantMap
+        UserTenantMap.objects.create(email='admin@test.localhost', tenant=test_tenant)
+        
         print("Test Tenant created.")
     else:
         print("Test Tenant already exists.")

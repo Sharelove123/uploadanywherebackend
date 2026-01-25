@@ -81,3 +81,39 @@ class UsageStatsView(APIView):
                 'platforms': limits.get('platforms', []),
             }
         })
+
+
+class TenantLookupView(APIView):
+    """
+    Public endpoint to lookup user's tenant by email.
+    Used for redirection during login.
+    """
+    permission_classes = [permissions.AllowAny]
+    
+    def post(self, request):
+        email = request.data.get('email')
+        if not email:
+            return Response({'error': 'Email is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # We need to look into PUBLIC schema
+        from django_tenants.utils import schema_context
+        from apps.tenants.models import UserTenantMap
+        
+        try:
+            with schema_context('public'):
+                mapping = UserTenantMap.objects.get(email=email)
+                
+                # Get primary domain for this tenant
+                domains = mapping.tenant.domains.all()
+                primary_domain = domains.filter(is_primary=True).first() or domains.first()
+                
+                if not primary_domain:
+                    return Response({'error': 'Tenant found but no domain configured.'}, status=status.HTTP_404_NOT_FOUND)
+                
+                return Response({
+                    'found': True,
+                    'tenant_name': mapping.tenant.name,
+                    'tenant_domain': primary_domain.domain
+                })
+        except UserTenantMap.DoesNotExist:
+            return Response({'found': False, 'message': 'No tenant mapping found.'}, status=status.HTTP_200_OK)

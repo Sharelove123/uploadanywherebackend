@@ -138,6 +138,39 @@ class AcceptInvitationView(APIView):
                 invite.accepted = True
                 invite.save()
                 
+                # Update UserTenantMap in PUBLIC schema
+                # We need to switch to public schema to write to UserTenantMap
+                from django_tenants.utils import schema_context
+                from apps.tenants.models import UserTenantMap
+                from django.db import connection
+                
+                # Get current tenant (Client)
+                current_tenant = connection.tenant
+                
+                with schema_context('public'):
+                    UserTenantMap.objects.get_or_create(
+                        email=user.email,
+                        defaults={'tenant': current_tenant} 
+                    )
+                    # Note: If user belongs to multiple tenants, this simple map 
+                    # might only store the first one or need a ManyToMany approach.
+                    # For now, we assume 1:1 or we just redirect to the first one found.
+                    # If we used get_or_create, it won't overwrite existing map associated with another tenant if email unique.
+                    # Ideally UserTenantMap should allow multiple? 
+                    # But for redirection we probably want a "default" or just check if they exist.
+                    # Let's stick to 1:1 for simplicity or update if needed. 
+                    # Actually valid requirement: User could belong to multiple teams with same email?
+                    # If so, UserTenantMap email should NOT be unique in model logic if we want to support multiple.
+                    # But the model I created has unique=True.
+                    # For this implementation, I will assume unique=True (1 user -> 1 tenant main mapping).
+                    # If they join another, we might update it or fail.
+                    # Let's use update_or_create to point to latest tenant?
+                    
+                    UserTenantMap.objects.update_or_create(
+                        email=user.email,
+                        defaults={'tenant': current_tenant}
+                    )
+                
                 return Response({'message': 'Invitation accepted. Please login.'}, status=status.HTTP_201_CREATED)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)

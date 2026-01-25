@@ -53,18 +53,94 @@ class RepurposedPostViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def publish(self, request, pk=None):
         """Publish a post to social media."""
+        from apps.social_accounts.models import SocialAccount
+        from apps.social_accounts.services import SocialMediaService
+        from django.utils import timezone
+
         post = self.get_object()
         serializer = PublishPostSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
-        # TODO: Implement actual publishing logic
-        post.status = RepurposedPost.Status.PUBLISHED
-        post.save()
+        # 1. Get Social Account
+        account_id = serializer.validated_data.get('social_account_id')
+        if account_id:
+            try:
+                account = SocialAccount.objects.get(id=account_id, user=request.user, is_active=True)
+            except SocialAccount.DoesNotExist:
+                return Response({'error': 'Invalid social account.'}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            # Auto-select
+            account = SocialAccount.objects.filter(
+                user=request.user, 
+                platform=post.platform, 
+                is_active=True
+            ).first()
+            if not account:
+                return Response({'error': f'No connected {post.get_platform_display()} account found.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 2. Call Service
+        result = {'success': False, 'error': 'Unknown platform'}
         
-        return Response({
-            'message': 'Post published successfully.',
-            'post': RepurposedPostSerializer(post).data
-        })
+        if post.platform == SocialAccount.Platform.LINKEDIN:
+            result = SocialMediaService.post_to_linkedin(
+                account.access_token, 
+                account.platform_user_id, 
+                post.generated_content,
+                media_file=post.media_file
+            )
+        elif post.platform == SocialAccount.Platform.TWITTER:
+            result = SocialMediaService.post_to_twitter(
+                account.access_token,
+                post.generated_content,
+                media_file=post.media_file
+            )
+        elif post.platform == SocialAccount.Platform.YOUTUBE:
+            if not post.media_file:
+                return Response({'error': 'Video file is required for YouTube.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            result = SocialMediaService.post_to_youtube(
+                account.access_token,
+                title=post.hook or f"Video by {request.user.username}", # Fallback title
+                description=post.generated_content,
+                video_file=post.media_file
+            )
+        elif post.platform == SocialAccount.Platform.INSTAGRAM:
+            if not post.media_file:
+                return Response({'error': 'Image file is required for Instagram.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Instagram requires a public URL
+            image_url = request.build_absolute_uri(post.media_file.url)
+            
+            # If running locally (lvh.me), replace with ngrok or warn user
+            # For now, we pass the URL as is. If localhost, FB will reject it.
+            
+            result = SocialMediaService.post_to_instagram(
+                account.access_token,
+                account.platform_user_id,
+                caption=post.generated_content,
+                image_url=image_url
+            )
+            
+        # 3. Handle Result
+        if result['success']:
+            post.status = RepurposedPost.Status.PUBLISHED
+            post.published_at = timezone.now()
+            post.platform_post_id = str(result.get('id', ''))
+            post.platform_post_url = result.get('url', '')
+            post.save()
+            
+            return Response({
+                'message': 'Post published successfully.',
+                'post': RepurposedPostSerializer(post).data
+            })
+        else:
+            post.status = RepurposedPost.Status.FAILED
+            post.error_message = result.get('error', 'Unknown error')
+            post.save()
+            return Response({
+                'error': f"Publishing failed: {result.get('error')}",
+                'post': RepurposedPostSerializer(post).data
+            }, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=['post'])
     def regenerate(self, request, pk=None):
@@ -165,12 +241,13 @@ class RepurposeView(APIView):
                 generated = ai_engine.generate_post(
                     content=extracted_text,
                     platform=post.platform,
-                    brand_voice=brand_voice
+                    brand_voice=brand_voice,
+                    source_url=content_source.source_url
                 )
                 post.generated_content = generated.get('content', '')
                 post.hook = generated.get('hook', '')
-                post.hashtags = generated.get('hashtags', [])
-                post.thread_posts = generated.get('thread_posts', [])
+                post.hashtags = generated.get('hashtags') or []
+                post.thread_posts = generated.get('thread_posts') or []
                 post.status = RepurposedPost.Status.READY
                 post.save()
             
@@ -187,7 +264,7 @@ class RepurposeView(APIView):
             
             for post in posts:
                 post.status = RepurposedPost.Status.FAILED
-                post.error_message = 'AI packages not installed. Please install: pip install httpx beautifulsoup4 google-generativeai youtube-transcript-api'
+                post.error_message = 'AI packages not installed. Please install: pip install httpx beautifulsoup4 google-generativeai youtube-transcript-api PyPDF2'
                 post.save()
             
             return Response({

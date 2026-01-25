@@ -67,3 +67,19 @@ class Domain(DomainMixin):
     e.g., john.uploadanywhere.com or acme.uploadanywhere.com
     """
     pass
+
+
+class UserTenantMap(models.Model):
+    """
+    Mapping between user email and tenant.
+    Resides in PUBLIC schema to allow looking up where a user belongs
+    before they log in.
+    """
+    email = models.EmailField(unique=True)
+    tenant = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='user_maps')
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.email} -> {self.tenant.schema_name}"

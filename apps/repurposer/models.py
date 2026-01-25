@@ -138,3 +138,7 @@ class RepurposedPost(models.Model):
         """Get a preview of the generated content."""
         content = self.generated_content or ''
         return content[:150] + '...' if len(content) > 150 else content
+
+    # Media attachment
+    media_file = models.FileField(upload_to='post_media/', blank=True, null=True, help_text="Image or video file to attach")
+
