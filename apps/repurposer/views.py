@@ -263,7 +263,8 @@ class RepurposeView(APIView):
                     content=extracted_text,
                     platform=post.platform,
                     brand_voice=brand_voice,
-                    source_url=content_source.source_url
+                    source_url=content_source.source_url,
+                    user_prompt=data.get('user_prompt')
                 )
                 post.generated_content = generated.get('content', '')
                 post.hook = generated.get('hook', '')

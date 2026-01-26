@@ -95,6 +95,7 @@ class RepurposeRequestSerializer(serializers.Serializer):
     )
     brand_voice_id = serializers.IntegerField(required=False, allow_null=True)
     title = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    user_prompt = serializers.CharField(required=False, allow_blank=True)
 
     def validate(self, data):
         if not data.get('source_url') and not data.get('raw_text'):

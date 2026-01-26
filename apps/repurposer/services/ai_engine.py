@@ -16,13 +16,13 @@ class AIEngine:
         genai.configure(api_key=api_key)
         self.model = genai.GenerativeModel('gemini-2.5-flash')
 
-    def generate_post(self, content: str, platform: str, brand_voice=None, source_url=None) -> dict:
+    def generate_post(self, content: str, platform: str, brand_voice=None, source_url=None, user_prompt=None) -> dict:
         """
         Generates a structured social media post for a specific platform.
         Returns a dictionary with keys: content, hook, hashtags, thread_posts (optional).
         """
         try:
-            prompt = self._build_prompt(content, platform, brand_voice)
+            prompt = self._build_prompt(content, platform, brand_voice, user_prompt)
             
             # Use JSON mode for structured output if supported, or prompt engineering
             generation_config = genai.types.GenerationConfig(
@@ -70,7 +70,7 @@ class AIEngine:
                 "hashtags": []
             }
 
-    def _build_prompt(self, content: str, platform: str, brand_voice=None) -> str:
+    def _build_prompt(self, content: str, platform: str, brand_voice=None, user_prompt=None) -> str:
         """Constructs a specific prompt for the target platform requesting JSON."""
         
         voice_instruction = ""
@@ -78,6 +78,10 @@ class AIEngine:
             voice_instruction = f"Use the following brand voice/style: {brand_voice.name}. {brand_voice.description}"
         else:
             voice_instruction = "Write in a professional yet engaging, human-like tone. Avoid buzzwords. Be punchy."
+
+        custom_instruction = ""
+        if user_prompt:
+            custom_instruction = f"IMPORTANT - User's Custom Instruction: {user_prompt}"
 
         platform_instruction = ""
         if platform == 'twitter':
@@ -95,6 +99,7 @@ class AIEngine:
         
         {platform_instruction}
         {voice_instruction}
+        {custom_instruction}
         
         Return the result strictly as a valid JSON object with the following schema:
         {{
