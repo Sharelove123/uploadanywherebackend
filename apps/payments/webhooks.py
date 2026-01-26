@@ -12,9 +12,13 @@ logger = logging.getLogger(__name__)
 
 @csrf_exempt
 def stripe_webhook(request):
+    logger.info("--- STRIPE WEBHOOK RECEIVED ---")
     payload = request.body
     sig_header = request.headers.get('Stripe-Signature')
     endpoint_secret = settings.STRIPE_WEBHOOK_SECRET
+    
+    logger.info(f"Signature: {sig_header}")
+    logger.info(f"Payload (start): {payload[:100]}")
 
     event = None
 
@@ -22,24 +26,37 @@ def stripe_webhook(request):
         event = stripe.Webhook.construct_event(
             payload, sig_header, endpoint_secret
         )
+        logger.info(f"Event constructed successfully: {event['type']}")
     except ValueError as e:
         # Invalid payload
+        logger.error(f"Invalid payload: {e}")
         return HttpResponse(status=400)
     except stripe.error.SignatureVerificationError as e:
         # Invalid signature
+        logger.error(f"Invalid signature: {e}")
+        return HttpResponse(status=400)
+    except Exception as e:
+        logger.error(f"Unexpected error constructing event: {e}")
         return HttpResponse(status=400)
 
     # Handle the event
+    logger.info(f"Processing event type: {event['type']}")
     if event['type'] == 'checkout.session.completed':
         session = event['data']['object']
+        logger.info(f"Handling checkout session: {session.get('id')}")
         handle_checkout_session(session)
     elif event['type'] == 'invoice.payment_succeeded':
         invoice = event['data']['object']
+        logger.info(f"Handling invoice payment: {invoice.get('id')}")
         handle_invoice_payment_succeeded(invoice)
     elif event['type'] == 'customer.subscription.deleted':
         subscription = event['data']['object']
+        logger.info(f"Handling subscription deleted: {subscription.get('id')}")
         handle_subscription_deleted(subscription)
+    else:
+        logger.info(f"Unhandled event type: {event['type']}")
 
+    logger.info("--- WEBHOOK PROCESSED ---")
     return HttpResponse(status=200)
 
 def handle_subscription_deleted(subscription):
