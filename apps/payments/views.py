@@ -5,6 +5,7 @@ from django.conf import settings
 from django.utils import timezone
 from rest_framework import views, status, permissions
 from rest_framework.response import Response
+from django.db import models
 from .models import SubscriptionPlan
 
 logger = logging.getLogger(__name__)
@@ -25,16 +26,26 @@ class CreateCheckoutSessionView(views.APIView):
         try:
             # Look up internal plan to get Stripe Price ID
             # Plans are stored in public schema
-            if str(plan_id).isdigit():
-                with schema_context('public'):
+            plan = None
+            price_id = None
+            
+            with schema_context('public'):
+                if str(plan_id).isdigit():
                     plan = SubscriptionPlan.objects.get(id=plan_id)
                     price_id = plan.stripe_price_id_yearly if interval == 'yearly' else plan.stripe_price_id_monthly
-            else:
-                # If plan_id is already a stripe ID (e.g. from frontend hardcoded)
-                price_id = plan_id 
-                
+                else:
+                    # Try to find plan by stripe price id
+                    price_id = plan_id
+                    plan = SubscriptionPlan.objects.filter(
+                        models.Q(stripe_price_id_monthly=price_id) | 
+                        models.Q(stripe_price_id_yearly=price_id)
+                    ).first()
+
             if not price_id:
                 return Response({'error': 'Invalid plan or configuration missing price ID'}, status=status.HTTP_400_BAD_REQUEST)
+                
+            if not plan:
+                return Response({'error': 'Matching subscription plan not found in database.'}, status=status.HTTP_400_BAD_REQUEST)
 
             # Build return URLs using the request origin (tenant subdomain)
             # This ensures users return to their tenant subdomain after checkout
@@ -58,7 +69,7 @@ class CreateCheckoutSessionView(views.APIView):
                 cancel_url=origin + '/dashboard/subscription?canceled=true',
                 metadata={
                     'user_id': request.user.id,
-                    'plan_id': plan_id,
+                    'plan_id': plan.id, # Always pass internal ID
                 }
             )
             
