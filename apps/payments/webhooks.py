@@ -34,8 +34,8 @@ def stripe_webhook(request):
         session = event['data']['object']
         handle_checkout_session(session)
     elif event['type'] == 'invoice.payment_succeeded':
-        # Extend subscription logic if needed (usually handled by subscription status)
-        pass
+        invoice = event['data']['object']
+        handle_invoice_payment_succeeded(invoice)
     elif event['type'] == 'customer.subscription.deleted':
         subscription = event['data']['object']
         handle_subscription_deleted(subscription)
@@ -45,16 +45,67 @@ def stripe_webhook(request):
 def handle_subscription_deleted(subscription):
     stripe_customer_id = subscription.get('customer')
     User = get_user_model()
+    from django_tenants.utils import get_tenant_model, schema_context
+    Tenant = get_tenant_model()
     
+    # 1. Update Public
     try:
-        user = User.objects.get(stripe_customer_id=stripe_customer_id)
-        # Downgrade to Free
-        user.subscription_tier = 'free'
-        user.save()
-        logger.info(f"Subscription expired/cancelled for user {user.username}. Downgraded to Free.")
-        
+        with schema_context('public'):
+            user = User.objects.get(stripe_customer_id=stripe_customer_id)
+            user.subscription_tier = 'free'
+            user.save()
+            logger.info(f"Public: Subscription cancelled for {user.username}")
     except User.DoesNotExist:
-        logger.warning(f"User not found for subscription deletion: {stripe_customer_id}")
+        pass
+
+    # 2. Update Tenants
+    tenants = Tenant.objects.exclude(schema_name='public')
+    for tenant in tenants:
+        try:
+            with schema_context(tenant.schema_name):
+                user = User.objects.filter(stripe_customer_id=stripe_customer_id).first()
+                if user:
+                    user.subscription_tier = 'free'
+                    user.save()
+                    logger.info(f"{tenant.schema_name}: Subscription cancelled for {user.username}")
+        except Exception:
+            pass
+
+def handle_invoice_payment_succeeded(invoice):
+    """Reset usage on successful plan renewal/payment."""
+    stripe_customer_id = invoice.get('customer')
+    # Use subscription ID to verify if needed, but simple payment success is enough for reset
+    
+    User = get_user_model()
+    from django_tenants.utils import get_tenant_model, schema_context
+    Tenant = get_tenant_model()
+
+    logger.info(f"Processing renewal reset for customer {stripe_customer_id}")
+
+    # 1. Reset Public
+    try:
+        with schema_context('public'):
+            user = User.objects.get(stripe_customer_id=stripe_customer_id)
+            user.repurposes_used_this_month = 0
+            user.usage_reset_date = timezone.now().date()
+            user.save()
+            logger.info(f"Public: Usage reset for {user.username}")
+    except User.DoesNotExist:
+        pass
+
+    # 2. Reset Tenants
+    tenants = Tenant.objects.exclude(schema_name='public')
+    for tenant in tenants:
+        try:
+            with schema_context(tenant.schema_name):
+                user = User.objects.filter(stripe_customer_id=stripe_customer_id).first()
+                if user:
+                    user.repurposes_used_this_month = 0
+                    user.usage_reset_date = timezone.now().date()
+                    user.save()
+                    logger.info(f"{tenant.schema_name}: Usage reset for {user.username}")
+        except Exception as e:
+            logger.error(f"{tenant.schema_name}: Failed to reset usage: {str(e)}")
 
 def handle_checkout_session(session):
     client_reference_id = session.get('client_reference_id')

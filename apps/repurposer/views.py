@@ -108,11 +108,14 @@ class RepurposedPostViewSet(viewsets.ModelViewSet):
             if not post.media_file:
                 return Response({'error': 'Image file is required for Instagram.'}, status=status.HTTP_400_BAD_REQUEST)
             
-            # Instagram requires a public URL
+            # Instagram requires a publicly accessible URL
             image_url = request.build_absolute_uri(post.media_file.url)
             
-            # If running locally (lvh.me), replace with ngrok or warn user
-            # For now, we pass the URL as is. If localhost, FB will reject it.
+            # Check if URL is localhost - Meta APIs cannot access localhost
+            if any(x in image_url.lower() for x in ['localhost', '127.0.0.1', 'lvh.me', '0.0.0.0']):
+                return Response({
+                    'error': 'Instagram requires publicly accessible image URLs. Cannot post from localhost. Please deploy your backend to a public server (like Render) first, or use a public image hosting service.'
+                }, status=status.HTTP_400_BAD_REQUEST)
             
             result = SocialMediaService.post_to_instagram(
                 account.access_token,
@@ -125,6 +128,12 @@ class RepurposedPostViewSet(viewsets.ModelViewSet):
             image_url = None
             if post.media_file:
                 image_url = request.build_absolute_uri(post.media_file.url)
+                
+                # Check if URL is localhost - Meta APIs cannot access localhost
+                if any(x in image_url.lower() for x in ['localhost', '127.0.0.1', 'lvh.me', '0.0.0.0']):
+                    return Response({
+                        'error': 'Facebook requires publicly accessible image URLs. Cannot post from localhost. Please deploy your backend to a public server (like Render) first, or use a public image hosting service.'
+                    }, status=status.HTTP_400_BAD_REQUEST)
             
             result = SocialMediaService.post_to_facebook(
                 account.access_token,  # This is the Page Access Token

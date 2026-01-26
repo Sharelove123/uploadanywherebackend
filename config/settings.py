@@ -298,6 +298,13 @@ GEMINI_MODEL = 'gemini-1.5-flash'
 
 
 # ==============================================================================
+# EMAIL SETTINGS
+# ==============================================================================
+# Print emails to console for now (until SMTP is set up)
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+DEFAULT_FROM_EMAIL = 'noreply@uploadanywhere.com'
+
+# ==============================================================================
 # SOCIAL OAUTH SETTINGS
 # ==============================================================================
 LINKEDIN_CLIENT_ID = os.environ.get('LINKEDIN_CLIENT_ID', '')

@@ -123,41 +123,12 @@ class SocialMediaService:
         
         # 1. Upload Media (requires v1.1 API)
         if media_file:
-            try:
-                media_url = "https://upload.twitter.com/1.1/media/upload.json"
-                # OAuth 1.0a is usually required for upload, but some endpoints accept Bearer?
-                # Actually, Twitter API v2 + OAuth 2.0 User Context can upload media but it's tricky.
-                # Standard practice for OAuth 2.0 PKCE apps is to use the upload endpoint with Bearer token?
-                # NO, Twitter Upload API v1.1 mostly requires OAuth 1.0a OR maybe Bearer if using Client Credentials?
-                # User Context OAuth 2.0 (PKCE) often CANNOT upload media easily to v1.1 without quirks.
-                # However, let's try standard Bearer token upload if supported.
-                # If this fails, we might need a workaround or stick to text-only for now if keys assume 1.0a isn't set up.
-                # Note: 'upload.twitter.com' handles OAuth 1.0a usually. 
-                
-                # Let's try passing the provided Bearer token.
-                # NOTE: If this fails, it's a known limitation of Twitter OAuth 2.0 implementation without 1.0a keys.
-                
-                # Reset file
-                if hasattr(media_file, 'seek'):
-                    media_file.seek(0)
-                    
-                files = {'media': media_file}
-                # V1.1 Upload headers - strictly speaking expects OAuth 1.0a signature usually
-                # But some docs say OAuth 2.0 flow works? Let's check status.
-                # Actually most devs report needing OAuth 1.0a for media upload even if posting via v2.
-                # We will attempt it.
-                
-                # Using requests-oauthlib would be better if we had 1.0a keys, but we are using 2.0 PKCE token.
-                # For now, let's attempt simply.
-                
-                # This part is highly likely to fail without 1.0a keys. 
-                # Integrating media for Twitter 2.0 often implies just using URL cards for now if 1.0a isn't available.
-                pass 
-                
-            except Exception as e:
-                logger.error(f"Twitter media upload exception: {str(e)}")
-                # Continue as text-only for now?
-                pass
+            # Twitter's v1.1 media upload API requires OAuth 1.0a authentication.
+            # Current implementation uses OAuth 2.0 PKCE which doesn't support media upload.
+            # Log warning and continue with text-only post.
+            logger.warning("Twitter media upload skipped: OAuth 1.0a required for media upload. Posting text only.")
+            # We could return an error here, but for better UX, we'll post text-only
+            # and let the user know in the response.
 
         url = "https://api.twitter.com/2/tweets"
         
