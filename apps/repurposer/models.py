@@ -117,6 +117,26 @@ class RepurposedPost(models.Model):
     platform_post_id = models.CharField(max_length=255, blank=True, help_text="ID from platform after posting")
     platform_post_url = models.URLField(blank=True)
     
+    # Recurring post settings
+    is_recurring = models.BooleanField(default=False)
+    recurrence_pattern = models.CharField(
+        max_length=20, 
+        choices=[
+            ('daily', 'Daily'),
+            ('weekly', 'Weekly'),
+            ('monthly', 'Monthly'),
+        ],
+        blank=True
+    )
+    recurrence_time = models.TimeField(null=True, blank=True, help_text="Time of day to post (UTC)")
+    recurrence_days = models.JSONField(
+        default=list, 
+        blank=True, 
+        help_text="Days of week (0=Mon, 6=Sun) for weekly, or day of month for monthly"
+    )
+    is_recurring_active = models.BooleanField(default=True, help_text="Pause/resume recurring posts")
+    last_recurrence_created = models.DateTimeField(null=True, blank=True)
+    
     # Metadata
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
