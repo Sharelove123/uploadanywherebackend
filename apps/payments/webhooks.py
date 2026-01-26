@@ -143,6 +143,19 @@ def handle_checkout_session(session):
                 user.stripe_subscription_id = stripe_subscription_id
             user.save()
             
+            # Update the Tenant (Client) Model
+            # This is critical because the tenant model is often the source of truth for features
+            from apps.tenants.models import UserTenantMap
+            tenant_map = UserTenantMap.objects.filter(email=user.email).first()
+            if tenant_map:
+                tenant = tenant_map.tenant
+                tenant.plan = plan
+                tenant.stripe_customer_id = stripe_customer_id
+                if stripe_subscription_id:
+                    tenant.stripe_subscription_id = stripe_subscription_id
+                tenant.save()
+                logger.info(f"Public: Updated tenant {tenant.schema_name} plan to {plan.name}")
+
             # Log payment
             PaymentHistory.objects.create(
                 user=user,
