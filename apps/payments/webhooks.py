@@ -132,9 +132,11 @@ def handle_checkout_session(session):
         return # Cannot proceed properly without plan
 
     # 1. Update in Public
+    user_email = None
     try:
         with schema_context('public'):
             user = User.objects.get(id=client_reference_id)
+            user_email = user.email
             user.subscription_tier = plan.name
             user.stripe_customer_id = stripe_customer_id
             if stripe_subscription_id:
@@ -152,18 +154,21 @@ def handle_checkout_session(session):
             logger.info(f"Public: Subscription activated for user {user.username}")
     except User.DoesNotExist:
         logger.warning(f"Public: User {client_reference_id} not found")
+        return # If user not in public, can't sync email
 
     # 2. Update in All Tenants
     tenants = Tenant.objects.exclude(schema_name='public')
     for tenant in tenants:
         try:
             with schema_context(tenant.schema_name):
-                # Try to find matching user (by ID should work if synced, otherwise email)
+                # Try to find matching user by ID first
                 user = User.objects.filter(id=client_reference_id).first()
+                
+                # Fallback to email if not found by ID
+                if not user and user_email:
+                    user = User.objects.filter(email=user_email).first()
+
                 if not user:
-                     # Fallback to email if IDs diverged (unlikely with shared users but safe)
-                     # We need to fetch email from public user first to know what to look for?
-                     # Ideally IDs match. If not, we skip.
                      continue
                 
                 user.subscription_tier = plan.name
