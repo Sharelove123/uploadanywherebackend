@@ -47,7 +47,7 @@ class AIEngine:
                             result['thread_posts'][-1] += f" {source_url}"
                         elif 'content' in result:
                             result['content'] += f" {source_url}"
-                    elif platform in ['youtube', 'instagram']:
+                    elif platform in ['youtube', 'instagram', 'facebook']:
                         if 'content' in result:
                             result['content'] += f"\n\n🔗 Original: {source_url}"
                             
@@ -92,6 +92,8 @@ class AIEngine:
             platform_instruction = "Create an engaging YouTube video title (hook) and a detailed, SEO-friendly video description (content)."
         elif platform == 'instagram':
             platform_instruction = "Create a vibrant Instagram caption. Use emojis creatively and keep the flow energetic. Focus on engagement."
+        elif platform == 'facebook':
+            platform_instruction = "Create an engaging Facebook post. Use a conversational tone, ask a question to drive comments, and use relevant emojis."
 
         base_prompt = f"""
         You are an expert social media manager. I will provide you with content.

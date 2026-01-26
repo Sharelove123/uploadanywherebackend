@@ -105,42 +105,14 @@ class RepurposedPostViewSet(viewsets.ModelViewSet):
                 video_file=post.media_file
             )
         elif post.platform == SocialAccount.Platform.INSTAGRAM:
-            if not post.media_file:
-                return Response({'error': 'Image file is required for Instagram.'}, status=status.HTTP_400_BAD_REQUEST)
-            
-            # Instagram requires a publicly accessible URL
-            image_url = request.build_absolute_uri(post.media_file.url)
-            
-            # Check if URL is localhost - Meta APIs cannot access localhost
-            if any(x in image_url.lower() for x in ['localhost', '127.0.0.1', 'lvh.me', '0.0.0.0']):
-                return Response({
-                    'error': 'Instagram requires publicly accessible image URLs. Cannot post from localhost. Please deploy your backend to a public server (like Render) first, or use a public image hosting service.'
-                }, status=status.HTTP_400_BAD_REQUEST)
-            
-            result = SocialMediaService.post_to_instagram(
-                account.access_token,
-                account.platform_user_id,
-                caption=post.generated_content,
-                image_url=image_url
-            )
+            return Response({
+                'error': 'Direct publishing to Instagram is currently disabled. You can copy the generated content and post manually.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
         elif post.platform == SocialAccount.Platform.FACEBOOK:
-            # Facebook Page posting - uses Page Access Token stored during connection
-            image_url = None
-            if post.media_file:
-                image_url = request.build_absolute_uri(post.media_file.url)
-                
-                # Check if URL is localhost - Meta APIs cannot access localhost
-                if any(x in image_url.lower() for x in ['localhost', '127.0.0.1', 'lvh.me', '0.0.0.0']):
-                    return Response({
-                        'error': 'Facebook requires publicly accessible image URLs. Cannot post from localhost. Please deploy your backend to a public server (like Render) first, or use a public image hosting service.'
-                    }, status=status.HTTP_400_BAD_REQUEST)
-            
-            result = SocialMediaService.post_to_facebook(
-                account.access_token,  # This is the Page Access Token
-                account.platform_user_id,  # This is the Page ID
-                message=post.generated_content,
-                image_url=image_url
-            )
+            return Response({
+                'error': 'Direct publishing to Facebook is currently disabled. You can copy the generated content and post manually.'
+            }, status=status.HTTP_400_BAD_REQUEST)
             
         # 3. Handle Result
         if result['success']:
