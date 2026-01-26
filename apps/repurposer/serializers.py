@@ -33,7 +33,7 @@ class RepurposedPostSerializer(serializers.ModelSerializer):
             'id', 'platform', 'platform_display', 'brand_voice', 'brand_voice_name',
             'generated_content', 'hook', 'hashtags', 'thread_posts',
             'status', 'status_display', 'error_message',
-            'scheduled_for', 'published_at', 'platform_post_url',
+            'published_at', 'platform_post_url',
             'content_preview', 'is_thread', 'media_file',
             'created_at', 'updated_at'
         ]
