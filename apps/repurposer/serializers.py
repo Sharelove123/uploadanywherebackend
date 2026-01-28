@@ -89,6 +89,7 @@ class RepurposeRequestSerializer(serializers.Serializer):
     """Input serializer for the main repurpose endpoint."""
     source_url = serializers.URLField(required=False, allow_blank=True)
     raw_text = serializers.CharField(required=False, allow_blank=True)
+    source_file = serializers.FileField(required=False, allow_null=True)
     platforms = serializers.MultipleChoiceField(
         choices=RepurposedPost.Platform.choices,
         required=True
@@ -98,10 +99,11 @@ class RepurposeRequestSerializer(serializers.Serializer):
     user_prompt = serializers.CharField(required=False, allow_blank=True)
 
     def validate(self, data):
-        if not data.get('source_url') and not data.get('raw_text'):
+        if not data.get('source_url') and not data.get('raw_text') and not data.get('source_file'):
             raise serializers.ValidationError(
-                "You must provide either a 'source_url' or 'raw_text'."
+                "You must provide a 'source_url', 'raw_text', or 'source_file'."
             )
+
         
         # Validate brand voice belongs to user
         brand_voice_id = data.get('brand_voice_id')

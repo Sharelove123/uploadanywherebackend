@@ -141,3 +141,91 @@ class RepurposedPost(models.Model):
     # Media attachment
     media_file = models.FileField(upload_to='post_media/', blank=True, null=True, help_text="Image or video file to attach")
 
+
+class ScheduledPost(models.Model):
+    """Scheduled or periodic post configuration for automated publishing."""
+    
+    class Frequency(models.TextChoices):
+        ONCE = 'once', 'One Time'
+        DAILY = 'daily', 'Daily'
+        WEEKLY = 'weekly', 'Weekly'
+        MONTHLY = 'monthly', 'Monthly'
+    
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        ACTIVE = 'active', 'Active'
+        COMPLETED = 'completed', 'Completed'
+        FAILED = 'failed', 'Failed'
+        PAUSED = 'paused', 'Paused'
+    
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='scheduled_posts'
+    )
+    # Link to an existing post OR generate new content
+    post = models.ForeignKey(
+        RepurposedPost,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='schedules',
+        help_text="Existing post to schedule. Leave empty to generate from prompt."
+    )
+    
+    # For AI-generated content (when post is null)
+    prompt = models.TextField(
+        blank=True,
+        help_text="AI prompt for generating new content on schedule"
+    )
+    platforms = models.JSONField(
+        default=list,
+        help_text="List of platforms to post to: ['youtube', 'linkedin']"
+    )
+    brand_voice = models.ForeignKey(
+        BrandVoice,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
+    )
+    
+    # Scheduling configuration
+    frequency = models.CharField(
+        max_length=20,
+        choices=Frequency.choices,
+        default=Frequency.ONCE
+    )
+    scheduled_time = models.DateTimeField(
+        help_text="When to publish (for one-time) or start time (for recurring)"
+    )
+    
+    # Tracking
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING
+    )
+    is_active = models.BooleanField(default=True)
+    last_run = models.DateTimeField(null=True, blank=True)
+    next_run = models.DateTimeField(null=True, blank=True)
+    run_count = models.PositiveIntegerField(default=0)
+    error_message = models.TextField(blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-scheduled_time']
+        verbose_name = 'Scheduled Post'
+        verbose_name_plural = 'Scheduled Posts'
+    
+    def __str__(self):
+        if self.post:
+            return f"Schedule for {self.post} at {self.scheduled_time}"
+        return f"AI-generated {self.frequency} post at {self.scheduled_time}"
+    
+    def save(self, *args, **kwargs):
+        # Set next_run on creation
+        if not self.next_run and self.scheduled_time:
+            self.next_run = self.scheduled_time
+        super().save(*args, **kwargs)

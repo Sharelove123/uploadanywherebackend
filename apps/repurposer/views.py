@@ -155,6 +155,9 @@ class RepurposedPostViewSet(viewsets.ModelViewSet):
 class RepurposeView(APIView):
     """Main endpoint to submit content for repurposing."""
     permission_classes = [permissions.IsAuthenticated]
+    # Support file uploads
+    from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def post(self, request):
         serializer = RepurposeRequestSerializer(
@@ -176,7 +179,11 @@ class RepurposeView(APIView):
         
         # Determine source type
         source_url = data.get('source_url', '')
-        if 'youtube.com' in source_url or 'youtu.be' in source_url:
+        source_file = data.get('source_file')
+        
+        if source_file:
+            source_type = ContentSource.SourceType.PDF
+        elif 'youtube.com' in source_url or 'youtu.be' in source_url:
             source_type = ContentSource.SourceType.YOUTUBE
         elif source_url:
             source_type = ContentSource.SourceType.BLOG
@@ -191,6 +198,7 @@ class RepurposeView(APIView):
             raw_text=data.get('raw_text', ''),
             title=data.get('title', '')
         )
+
         
         # Get brand voice if specified
         brand_voice = None
@@ -220,9 +228,13 @@ class RepurposeView(APIView):
                 extracted_text, title = extractor.extract_youtube(source_url)
             elif source_type == ContentSource.SourceType.BLOG:
                 extracted_text, title = extractor.extract_blog(source_url)
+            elif source_type == ContentSource.SourceType.PDF and source_file:
+                extracted_text = extractor.extract_pdf_content(source_file)
+                title = data.get('title', '') or source_file.name.rsplit('.', 1)[0] or 'Uploaded Document'
             else:
                 extracted_text = content_source.raw_text
                 title = data.get('title', 'Untitled')
+
             
             content_source.raw_text = extracted_text
             content_source.title = title or content_source.title or 'Untitled'
