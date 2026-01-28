@@ -32,7 +32,16 @@ class ContentExtractor:
             
             return full_transcript, title
         except Exception as e:
-            logger.error(f"Error extracting YouTube transcript: {str(e)}")
+            error_str = str(e)
+            logger.error(f"Error extracting YouTube transcript: {error_str}")
+            
+            # Check for IP blocking errors
+            if 'blocked' in error_str.lower() or 'ip' in error_str.lower() or 'cloud' in error_str.lower():
+                raise ValueError(
+                    "YouTube is blocking requests from our server. "
+                    "Workaround: Open the YouTube video, click '...' → 'Show transcript', "
+                    "copy the text, and paste it in the 'Text' tab instead."
+                )
             raise e
 
     @staticmethod
