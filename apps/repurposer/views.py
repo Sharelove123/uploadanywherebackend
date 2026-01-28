@@ -298,3 +298,44 @@ class RepurposeView(APIView):
             'source': ContentSourceSerializer(content_source).data,
             'posts': RepurposedPostSerializer(posts, many=True).data
         }, status=status.HTTP_201_CREATED)
+
+
+class ScheduledPostViewSet(viewsets.ModelViewSet):
+    """CRUD operations for Scheduled Posts."""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_serializer_class(self):
+        from .scheduled_serializers import ScheduledPostSerializer, ScheduledPostCreateSerializer
+        if self.action == 'create':
+            return ScheduledPostCreateSerializer
+        return ScheduledPostSerializer
+    
+    def get_queryset(self):
+        from .models import ScheduledPost
+        return ScheduledPost.objects.filter(user=self.request.user)
+    
+    @action(detail=True, methods=['post'])
+    def pause(self, request, pk=None):
+        """Pause a scheduled post."""
+        scheduled = self.get_object()
+        scheduled.is_active = False
+        scheduled.status = 'paused'
+        scheduled.save()
+        from .scheduled_serializers import ScheduledPostSerializer
+        return Response({
+            'message': 'Scheduled post paused.',
+            'scheduled_post': ScheduledPostSerializer(scheduled).data
+        })
+    
+    @action(detail=True, methods=['post'])
+    def resume(self, request, pk=None):
+        """Resume a paused scheduled post."""
+        scheduled = self.get_object()
+        scheduled.is_active = True
+        scheduled.status = 'active'
+        scheduled.save()
+        from .scheduled_serializers import ScheduledPostSerializer
+        return Response({
+            'message': 'Scheduled post resumed.',
+            'scheduled_post': ScheduledPostSerializer(scheduled).data
+        })

@@ -11,6 +11,7 @@ router = DefaultRouter()
 router.register(r'brand-voices', views.BrandVoiceViewSet, basename='brand-voice')
 router.register(r'sources', views.ContentSourceViewSet, basename='source')
 router.register(r'posts', views.RepurposedPostViewSet, basename='post')
+router.register(r'scheduled-posts', views.ScheduledPostViewSet, basename='scheduled-post')
 
 urlpatterns = [
     path('', include(router.urls)),
