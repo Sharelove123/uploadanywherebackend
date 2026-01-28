@@ -39,19 +39,59 @@ class ContentExtractor:
     def extract_blog(url: str) -> tuple[str, str]:
         """Extracts main text content and title from a blog article URL."""
         try:
+            import random
+            import time
+            
+            # Check if it's a Medium URL - these require special handling
+            is_medium = 'medium.com' in url.lower()
+            
+            # List of user agents to rotate
+            user_agents = [
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15",
+            ]
+            
             headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-                "Accept-Language": "en-US,en;q=0.5",
+                "User-Agent": random.choice(user_agents),
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.9",
                 "Accept-Encoding": "gzip, deflate, br",
                 "Connection": "keep-alive",
-                "Referer": "https://www.google.com/",
+                "Referer": "https://www.google.com/search?q=blog",
                 "Upgrade-Insecure-Requests": "1",
+                "Sec-Fetch-Dest": "document",
+                "Sec-Fetch-Mode": "navigate",
+                "Sec-Fetch-Site": "cross-site",
+                "Sec-Fetch-User": "?1",
+                "Cache-Control": "max-age=0",
             }
+            
             # Use session for better cookie handling
             session = requests.Session()
-            response = session.get(url, headers=headers, timeout=15, verify=True)
-            response.raise_for_status()
+            
+            # Add delay for Medium to look more human
+            if is_medium:
+                time.sleep(random.uniform(1, 2))
+            
+            # Try up to 3 times with different user agents
+            last_error = None
+            for attempt in range(3):
+                try:
+                    if attempt > 0:
+                        headers["User-Agent"] = random.choice(user_agents)
+                        time.sleep(random.uniform(1, 3))
+                    
+                    response = session.get(url, headers=headers, timeout=20, verify=True, allow_redirects=True)
+                    response.raise_for_status()
+                    break
+                except requests.exceptions.HTTPError as e:
+                    last_error = e
+                    if response.status_code == 403 and attempt < 2:
+                        continue  # Retry with different user agent
+                    raise
+            
             soup = BeautifulSoup(response.text, 'html.parser')
             
             title = soup.title.string if soup.title else "Blog Article"
@@ -62,7 +102,7 @@ class ContentExtractor:
                 paragraphs = article.find_all('p')
             else:
                 # Fallback: look for main content div
-                main = soup.find('main') or soup.find('div', {'class': ['content', 'post-content', 'article-content']})
+                main = soup.find('main') or soup.find('div', {'class': ['content', 'post-content', 'article-content', 'story-content']})
                 if main:
                     paragraphs = main.find_all('p')
                 else:
@@ -78,11 +118,27 @@ class ContentExtractor:
                 body = soup.find('body')
                 if body:
                     text = body.get_text(separator='\n', strip=True)
+            
+            # Check if we got meaningful content
+            if not text or len(text) < 100:
+                raise ValueError(
+                    "Could not extract article content. The page may be behind a paywall, "
+                    "require login, or block automated access. Try copying the text directly instead."
+                )
                     
             return text, title
         except requests.exceptions.Timeout:
             logger.error(f"Timeout extracting blog content from: {url}")
             raise ValueError("The website took too long to respond. Please try again.")
+        except requests.exceptions.HTTPError as e:
+            if '403' in str(e):
+                logger.error(f"403 Forbidden extracting blog from: {url}")
+                raise ValueError(
+                    "This website blocks automated access (403 Forbidden). "
+                    "Please copy the article text and paste it in the 'Text' tab instead."
+                )
+            logger.error(f"HTTP error extracting blog content: {str(e)}")
+            raise ValueError(f"Could not access the URL: {str(e)}")
         except requests.exceptions.RequestException as e:
             logger.error(f"Request error extracting blog content: {str(e)}")
             raise ValueError(f"Could not access the URL: {str(e)}")
