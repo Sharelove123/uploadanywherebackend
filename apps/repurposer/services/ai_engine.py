@@ -111,8 +111,13 @@ class AIEngine:
             "thread_posts": ["tweet 1", "tweet 2", ...] (Only for Twitter threads. Otherwise omit.)
         }}
 
-        Here is the content:
-        "{content[:20000]}..." (truncated)
+        IMPORTANT: Base your post ONLY on the content provided below. Do NOT make up information.
+        
+        Here is the source content to repurpose:
+        ---
+        {content[:20000]}
+        ---
         """
         
         return base_prompt
+
