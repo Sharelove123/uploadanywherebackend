@@ -211,7 +211,12 @@ class RepurposeView(APIView):
         source_file = data.get('source_file')
         
         if source_file:
-            source_type = ContentSource.SourceType.PDF
+            # Check for file type
+            filename = source_file.name.lower()
+            if filename.endswith('.txt'):
+                source_type = ContentSource.SourceType.TEXT # Reuse TEXT type or add FILE_TEXT
+            else:
+                source_type = ContentSource.SourceType.PDF
         elif 'youtube.com' in source_url or 'youtu.be' in source_url:
             source_type = ContentSource.SourceType.YOUTUBE
         elif source_url:
@@ -260,6 +265,11 @@ class RepurposeView(APIView):
             elif source_type == ContentSource.SourceType.PDF and source_file:
                 extracted_text = extractor.extract_pdf_content(source_file)
                 title = data.get('title', '') or source_file.name.rsplit('.', 1)[0] or 'Uploaded Document'
+            elif source_type == ContentSource.SourceType.TEXT and source_file:
+                 # It's a text file upload
+                 source_file.seek(0)
+                 extracted_text = source_file.read().decode('utf-8', errors='ignore')
+                 title = data.get('title', '') or source_file.name.rsplit('.', 1)[0] or 'Uploaded Text'
             else:
                 extracted_text = content_source.raw_text
                 title = data.get('title', 'Untitled')
