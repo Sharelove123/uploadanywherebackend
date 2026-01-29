@@ -16,76 +16,100 @@ def process_scheduled_posts():
     This task runs every minute via Celery Beat.
     """
     from .models import ScheduledPost
+    from django_tenants.utils import get_tenant_model, schema_context
     
-    now = timezone.now()
+    TenantModel = get_tenant_model()
+    # Iterate over all tenants (excluding public if it doesn't have the app, 
+    # usually repurposer is only in tenant apps)
     
-    # Find posts due for publishing
-    due_posts = ScheduledPost.objects.filter(
-        is_active=True,
-        status__in=['pending', 'active'],
-        next_run__lte=now
-    )
+    total_queued = 0
     
-    logger.info(f"Found {due_posts.count()} scheduled posts due for publishing")
+    for tenant in TenantModel.objects.exclude(schema_name='public'):
+        try:
+            with schema_context(tenant.schema_name):
+                now = timezone.now()
+                
+                # Find posts due for publishing
+                due_posts = ScheduledPost.objects.filter(
+                    is_active=True,
+                    status__in=['pending', 'active'],
+                    next_run__lte=now
+                )
+                
+                count = due_posts.count()
+                if count > 0:
+                    logger.info(f"Tenant {tenant.schema_name}: Found {count} scheduled posts due")
+                    
+                    for scheduled in due_posts:
+                        # Pass schema_name to the worker task
+                        publish_scheduled_post.delay(scheduled.id, schema_name=tenant.schema_name)
+                    
+                    total_queued += count
+        except Exception as e:
+            logger.error(f"Error processing tenant {tenant.schema_name}: {e}")
+            continue
     
-    for scheduled in due_posts:
-        publish_scheduled_post.delay(scheduled.id)
-    
-    return f"Queued {due_posts.count()} posts for publishing"
+    return f"Queued {total_queued} posts for publishing across all tenants"
 
 
 @shared_task
-def publish_scheduled_post(scheduled_post_id):
+def publish_scheduled_post(scheduled_post_id, schema_name=None):
     """
     Publish a specific scheduled post to configured platforms.
     """
     from .models import ScheduledPost, RepurposedPost
     from apps.social_accounts.models import SocialAccount
     from apps.social_accounts.services import SocialMediaService
+    from django_tenants.utils import schema_context
     
-    try:
-        scheduled = ScheduledPost.objects.get(id=scheduled_post_id)
-    except ScheduledPost.DoesNotExist:
-        logger.error(f"ScheduledPost {scheduled_post_id} not found")
+    if not schema_name:
+        logger.error(f"Missing schema_name for scheduled_post {scheduled_post_id}")
         return
-    
-    logger.info(f"Processing scheduled post {scheduled.id}")
-    
-    try:
-        # If we have an existing post, publish it
-        if scheduled.post:
-            post = scheduled.post
-            result = _publish_post_to_platforms(scheduled.user, post)
-        else:
-            # Generate new content from prompt
-            result = _generate_and_publish(scheduled)
         
-        if result['success']:
-            scheduled.run_count += 1
-            scheduled.last_run = timezone.now()
-            scheduled.error_message = ''
-            
-            # Calculate next run for recurring posts
-            if scheduled.frequency == ScheduledPost.Frequency.ONCE:
-                scheduled.status = ScheduledPost.Status.COMPLETED
-                scheduled.is_active = False
+    with schema_context(schema_name):
+        try:
+            scheduled = ScheduledPost.objects.get(id=scheduled_post_id)
+        except ScheduledPost.DoesNotExist:
+            logger.error(f"ScheduledPost {scheduled_post_id} not found in schema {schema_name}")
+            return
+        
+        logger.info(f"Processing scheduled post {scheduled.id} for tenant {schema_name}")
+        
+        try:
+            # If we have an existing post, publish it
+            if scheduled.post:
+                post = scheduled.post
+                result = _publish_post_to_platforms(scheduled.user, post)
             else:
-                scheduled.next_run = _calculate_next_run(scheduled)
-                scheduled.status = ScheduledPost.Status.ACTIVE
+                # Generate new content from prompt
+                result = _generate_and_publish(scheduled)
             
-            scheduled.save()
-            logger.info(f"Successfully published scheduled post {scheduled.id}")
-        else:
+            if result['success']:
+                scheduled.run_count += 1
+                scheduled.last_run = timezone.now()
+                scheduled.error_message = ''
+                
+                # Calculate next run for recurring posts
+                if scheduled.frequency == ScheduledPost.Frequency.ONCE:
+                    scheduled.status = ScheduledPost.Status.COMPLETED
+                    scheduled.is_active = False
+                else:
+                    scheduled.next_run = _calculate_next_run(scheduled)
+                    scheduled.status = ScheduledPost.Status.ACTIVE
+                
+                scheduled.save()
+                logger.info(f"Successfully published scheduled post {scheduled.id}")
+            else:
+                scheduled.status = ScheduledPost.Status.FAILED
+                scheduled.error_message = result.get('error', 'Unknown error')
+                scheduled.save()
+                logger.error(f"Failed to publish scheduled post {scheduled.id}: {result.get('error')}")
+                
+        except Exception as e:
             scheduled.status = ScheduledPost.Status.FAILED
-            scheduled.error_message = result.get('error', 'Unknown error')
+            scheduled.error_message = str(e)
             scheduled.save()
-            logger.error(f"Failed to publish scheduled post {scheduled.id}: {result.get('error')}")
-            
-    except Exception as e:
-        scheduled.status = ScheduledPost.Status.FAILED
-        scheduled.error_message = str(e)
-        scheduled.save()
-        logger.exception(f"Exception publishing scheduled post {scheduled.id}")
+            logger.exception(f"Exception publishing scheduled post {scheduled.id}")
 
 
 def _publish_post_to_platforms(user, post):
