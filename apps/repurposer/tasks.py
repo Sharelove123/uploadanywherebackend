@@ -146,7 +146,7 @@ def _publish_post_to_platforms(user, post):
         )
     elif post.platform == 'twitter':
         return SocialMediaService.post_to_twitter(
-            account.access_token,
+            account,
             post.generated_content,
             media_file=post.media_file
         )

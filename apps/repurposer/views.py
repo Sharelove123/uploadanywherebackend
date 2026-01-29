@@ -90,7 +90,7 @@ class RepurposedPostViewSet(viewsets.ModelViewSet):
             )
         elif post.platform == SocialAccount.Platform.TWITTER:
             result = SocialMediaService.post_to_twitter(
-                account.access_token,
+                account,
                 post.generated_content,
                 media_file=post.media_file
             )

@@ -114,21 +114,72 @@ class SocialMediaService:
             }
 
     @staticmethod
-    def post_to_twitter(access_token, text, media_file=None):
+    def refresh_twitter_token(social_account):
+        """
+        Refreshes the Twitter OAuth 2.0 token.
+        """
+        import base64
+        from django.conf import settings
+        from django.utils import timezone
+        
+        client_id = getattr(settings, 'TWITTER_CLIENT_ID', settings.TWITTER_API_KEY)
+        client_secret = getattr(settings, 'TWITTER_CLIENT_SECRET', settings.TWITTER_API_SECRET)
+        
+        if not social_account.refresh_token:
+            logger.error(f"Cannot refresh Twitter token for {social_account.user}: No refresh token.")
+            return False
+
+        url = 'https://api.twitter.com/2/oauth2/token'
+        credentials = f"{client_id}:{client_secret}"
+        encoded_credentials = base64.b64encode(credentials.encode()).decode()
+        
+        headers = {
+            'Authorization': f'Basic {encoded_credentials}',
+            'Content-Type': 'application/x-www-form-urlencoded'
+        }
+        
+        data = {
+            'grant_type': 'refresh_token',
+            'refresh_token': social_account.refresh_token,
+            'client_id': client_id,
+        }
+        
+        try:
+            response = requests.post(url, data=data, headers=headers)
+            
+            if response.status_code == 200:
+                token_data = response.json()
+                social_account.access_token = token_data['access_token']
+                if 'refresh_token' in token_data:
+                    social_account.refresh_token = token_data['refresh_token']
+                
+                # Update expiration
+                expires_in = token_data.get('expires_in', 7200)
+                social_account.token_expires_at = timezone.now() + timezone.timedelta(seconds=int(expires_in))
+                social_account.save()
+                logger.info(f"Successfully refreshed Twitter token for {social_account.user}")
+                return True
+            else:
+                logger.error(f"Twitter token refresh failed: {response.text}")
+                return False
+        except Exception as e:
+            logger.exception(f"Exception refreshing Twitter token: {e}")
+            return False
+
+    @staticmethod
+    def post_to_twitter(social_account, text, media_file=None, retry=True):
         """
         Post text to Twitter (X) using V2 API.
-        Supports media upload via V1.1 API.
+        Auto-refreshes token on 401.
         """
+        access_token = social_account.access_token
         media_id = None
         
         # 1. Upload Media (requires v1.1 API)
         if media_file:
             # Twitter's v1.1 media upload API requires OAuth 1.0a authentication.
             # Current implementation uses OAuth 2.0 PKCE which doesn't support media upload.
-            # Log warning and continue with text-only post.
             logger.warning("Twitter media upload skipped: OAuth 1.0a required for media upload. Posting text only.")
-            # We could return an error here, but for better UX, we'll post text-only
-            # and let the user know in the response.
 
         url = "https://api.twitter.com/2/tweets"
         
@@ -141,9 +192,6 @@ class SocialMediaService:
             "text": text
         }
         
-        # if media_id:
-        #    payload['media'] = {'media_ids': [media_id]}
-        
         response = requests.post(url, headers=headers, json=payload)
         
         if response.status_code == 201:
@@ -153,6 +201,40 @@ class SocialMediaService:
                 'success': True,
                 'id': post_id,
                 'url': f"https://twitter.com/user/status/{post_id}" 
+            }
+        elif response.status_code == 401 and retry:
+            logger.info("Twitter 401 Unauthorized. Attempting token refresh...")
+            if SocialMediaService.refresh_twitter_token(social_account):
+                # Retry recursively once
+                return SocialMediaService.post_to_twitter(social_account, text, media_file, retry=False)
+            else:
+                 return {
+                    'success': False,
+                    'error': "Authentication failed. Re-connect your Twitter account."
+                }
+        elif response.status_code == 403 or response.status_code == 429:
+            # Handle Usage Limits
+            error_data = {}
+            try:
+                error_data = response.json()
+            except:
+                pass
+            
+            # Check for usage cap error specifically
+            # Twitter V2 errors are usually in 'errors' list or 'detail'
+            detail = error_data.get('detail', '')
+            title = error_data.get('title', '')
+            
+            # Common limitation messages
+            if "UsageCapExceeded" in str(error_data) or "UsageCapExceeded" in str(detail):
+                 return {
+                    'success': False,
+                    'error': "Twitter App Monthly Limit Reached. The platform's Free Tier limit (1500 posts/mo) has been exhausted for all users. Please try again next month."
+                }
+            
+            return {
+                'success': False,
+                'error': f"Twitter Permission/Limit Error: {title} - {detail}"
             }
         else:
             return {
