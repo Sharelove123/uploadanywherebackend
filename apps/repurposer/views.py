@@ -159,11 +159,21 @@ class RepurposeView(APIView):
     from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
-    def post(self, request):
+        # Debug Logging for Payload
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Repurpose Request Data: {request.data}")
+        logger.info(f"Repurpose Request Files: {request.FILES}")
+
         serializer = RepurposeRequestSerializer(
             data=request.data,
             context={'request': request}
         )
+        if not serializer.is_valid():
+            logger.error(f"Repurpose Validation Error: {serializer.errors}")
+            # Format error for frontend
+            error_msg = "Validation Error: " + ", ".join([f"{k}: {v[0]}" for k, v in serializer.errors.items()])
+            return Response({'error': error_msg, 'details': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
         serializer.is_valid(raise_exception=True)
         
         user = request.user

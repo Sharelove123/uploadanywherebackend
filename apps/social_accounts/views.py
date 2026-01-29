@@ -301,8 +301,15 @@ class SocialCallbackView(views.APIView):
     def _get_twitter_user_info(self, access_token):
         url = 'https://api.twitter.com/2/users/me'
         headers = {'Authorization': f'Bearer {access_token}'}
-        response = requests.get(url, headers=headers)
-        return response.json()
+        try:
+            response = requests.get(url, headers=headers)
+            if response.status_code == 429 or response.status_code == 403:
+                # If we hit read limits, return a dummy object so we don't block the connection
+                return {'data': {'id': 'unknown', 'username': 'Twitter User (Limit Reached)'}}
+            return response.json()
+        except Exception as e:
+            logger.error(f"Error fetching Twitter user info: {e}")
+            return {'data': {'id': 'unknown', 'username': 'Twitter User'}}
 
     def _exchange_youtube_token(self, code, redirect_uri):
         url = 'https://oauth2.googleapis.com/token'
