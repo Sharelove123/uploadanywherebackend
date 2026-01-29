@@ -160,6 +160,9 @@ class ContentExtractor:
     def extract_pdf_content(file_obj) -> str:
         """Extracts text from a PDF file object."""
         try:
+            # Ensure pointer is at the start
+            if hasattr(file_obj, 'seek'):
+                file_obj.seek(0)
             reader = PyPDF2.PdfReader(file_obj)
             text = ""
             for page in reader.pages:
