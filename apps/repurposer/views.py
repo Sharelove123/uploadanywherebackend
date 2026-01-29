@@ -166,8 +166,16 @@ class RepurposeView(APIView):
         logger.info(f"Repurpose Request Data: {request.data}")
         logger.info(f"Repurpose Request Files: {request.FILES}")
 
-        data = request.data.copy()
-        
+        # Convert QueryDict to standard dict to avoid list-wrapping issues
+        try:
+            data = request.data.dict()
+        except:
+            data = request.data.copy()
+            
+        # Merge Files into data (crucial since .dict() might exclude them or we want to overwrite)
+        for key, value in request.FILES.items():
+            data[key] = value
+
         # Explicitly parse platforms from string if needed
         if 'platforms' in data and isinstance(data['platforms'], str):
             try:
@@ -175,10 +183,6 @@ class RepurposeView(APIView):
                 data['platforms'] = json.loads(data['platforms'])
             except:
                 pass
-        
-        # Explicitly ensure source_file comes from FILES
-        if 'source_file' in request.FILES:
-            data['source_file'] = request.FILES['source_file']
         
         serializer = RepurposeRequestSerializer(
             data=data,
