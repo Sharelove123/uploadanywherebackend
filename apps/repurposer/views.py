@@ -159,6 +159,7 @@ class RepurposeView(APIView):
     from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
+    def post(self, request):
         # Debug Logging for Payload
         import logging
         logger = logging.getLogger(__name__)
