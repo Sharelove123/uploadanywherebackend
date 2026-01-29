@@ -166,8 +166,18 @@ class RepurposeView(APIView):
         logger.info(f"Repurpose Request Data: {request.data}")
         logger.info(f"Repurpose Request Files: {request.FILES}")
 
+        data = request.data.copy()
+        
+        # Handle 'platforms' being sent as a JSON string (common in FormData)
+        if 'platforms' in data and isinstance(data['platforms'], str):
+            try:
+                import json
+                data['platforms'] = json.loads(data['platforms'])
+            except:
+                pass
+
         serializer = RepurposeRequestSerializer(
-            data=request.data,
+            data=data,
             context={'request': request}
         )
         if not serializer.is_valid():
