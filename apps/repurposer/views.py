@@ -168,14 +168,18 @@ class RepurposeView(APIView):
 
         data = request.data.copy()
         
-        # Handle 'platforms' being sent as a JSON string (common in FormData)
+        # Explicitly parse platforms from string if needed
         if 'platforms' in data and isinstance(data['platforms'], str):
             try:
                 import json
                 data['platforms'] = json.loads(data['platforms'])
             except:
                 pass
-
+        
+        # Explicitly ensure source_file comes from FILES
+        if 'source_file' in request.FILES:
+            data['source_file'] = request.FILES['source_file']
+        
         serializer = RepurposeRequestSerializer(
             data=data,
             context={'request': request}
