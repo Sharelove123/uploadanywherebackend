@@ -212,34 +212,42 @@ class SocialMediaService:
                     'success': False,
                     'error': "Authentication failed. Re-connect your Twitter account."
                 }
-        elif response.status_code == 403 or response.status_code == 429:
-            # Handle Usage Limits
-            error_data = {}
+        else:
+            # Handle All Other Errors (400, 403, 429, 500 etc)
+            # Try to parse JSON to find specific Twitter API errors
+            error_msg = response.text
             try:
                 error_data = response.json()
+                
+                # Twitter V2 errors
+                detail = error_data.get('detail', '')
+                title = error_data.get('title', '')
+                error_type = error_data.get('type', '')
+                
+                # 1. Check for Credits Depleted (Free Tier Limit)
+                if "CreditsDepleted" in title or "problems/credits" in error_type:
+                     return {
+                        'success': False,
+                        'error': "Twitter Credits Depleted. The Free Tier limit (500 posts/month) has been reached for this account or App. Please try again next month or upgrade your X API tier."
+                    }
+                
+                # 2. Check for App Usage Cap
+                if "UsageCapExceeded" in str(error_data) or "UsageCapExceeded" in str(detail):
+                     return {
+                        'success': False,
+                        'error': "Twitter App Monthly Limit Reached. The platform's Free Tier limit has been exhausted. Please try again next month."
+                    }
+                
+                # 3. Use title/detail if available for other errors
+                if title or detail:
+                    error_msg = f"{title}: {detail}"
+                    
             except:
                 pass
-            
-            # Check for usage cap error specifically
-            # Twitter V2 errors are usually in 'errors' list or 'detail'
-            detail = error_data.get('detail', '')
-            title = error_data.get('title', '')
-            
-            # Common limitation messages
-            if "UsageCapExceeded" in str(error_data) or "UsageCapExceeded" in str(detail):
-                 return {
-                    'success': False,
-                    'error': "Twitter App Monthly Limit Reached. The platform's Free Tier limit (1500 posts/mo) has been exhausted for all users. Please try again next month."
-                }
-            
+                
             return {
                 'success': False,
-                'error': f"Twitter Permission/Limit Error: {title} - {detail}"
-            }
-        else:
-            return {
-                'success': False,
-                'error': response.text
+                'error': error_msg
             }
 
     @staticmethod
