@@ -10,6 +10,9 @@ python manage.py collectstatic --no-input
 python manage.py makemigrations --noinput || true
 python manage.py migrate_schemas --noinput
 
+# 12. Create Public Tenant if it doesn't exist
+python create_tenants.py
+
 # Make start script executable
 chmod +x start_combined.sh
 
