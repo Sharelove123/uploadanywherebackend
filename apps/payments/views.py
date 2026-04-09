@@ -96,15 +96,16 @@ class VerifyCheckoutSessionView(views.APIView):
 
         try:
             session = stripe.checkout.Session.retrieve(session_id)
+            session_data = session.to_dict_recursive() if hasattr(session, "to_dict_recursive") else session
 
-            if str(session.get('client_reference_id')) != str(request.user.id):
+            if str(session_data.get('client_reference_id')) != str(request.user.id):
                 return Response({'error': 'Checkout session does not belong to this user'}, status=status.HTTP_403_FORBIDDEN)
 
-            if session.get('payment_status') not in ('paid', 'no_payment_required'):
+            if session_data.get('payment_status') not in ('paid', 'no_payment_required'):
                 return Response({'error': 'Checkout session is not paid yet'}, status=status.HTTP_400_BAD_REQUEST)
 
             from .webhooks import handle_checkout_session
-            handle_checkout_session(session)
+            handle_checkout_session(session_data)
 
             from django_tenants.utils import schema_context
             with schema_context(request.tenant.schema_name):

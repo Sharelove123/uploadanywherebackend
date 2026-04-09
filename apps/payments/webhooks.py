@@ -11,7 +11,14 @@ from .models import PaymentHistory, SubscriptionPlan
 logger = logging.getLogger(__name__)
 
 
+def _as_plain_dict(value):
+    if hasattr(value, "to_dict_recursive"):
+        return value.to_dict_recursive()
+    return value
+
+
 def _get_session_email(session):
+    session = _as_plain_dict(session)
     customer_details = session.get('customer_details') or {}
     return (
         customer_details.get('email')
@@ -134,6 +141,7 @@ def handle_invoice_payment_succeeded(invoice):
             logger.error(f"{tenant.schema_name}: Failed to reset usage: {str(e)}")
 
 def handle_checkout_session(session):
+    session = _as_plain_dict(session)
     client_reference_id = session.get('client_reference_id')
     stripe_customer_id = session.get('customer')
     stripe_subscription_id = session.get('subscription')
