@@ -7,7 +7,8 @@ pip install -r requirements.txt
 python manage.py collectstatic --no-input
 
 # Run migrations for all tenants (django-tenants)
-python manage.py makemigrations --noinput || true
+python manage.py makemigrations --noinput
+python manage.py migrate --noinput
 python manage.py migrate_schemas --noinput
 
 # 12. Create Public Tenant if it doesn't exist

@@ -149,6 +149,12 @@ def handle_checkout_session(session):
     stripe_customer_id = _field(session, 'customer')
     stripe_subscription_id = _field(session, 'subscription')
     metadata = _field(session, 'metadata', {}) or {}
+    # Convert Stripe object to dict if necessary
+    if not isinstance(metadata, dict):
+        try:
+            metadata = dict(metadata)
+        except (TypeError, ValueError):
+            metadata = {}
     user_email = _get_session_email(session)
     
     User = get_user_model()
