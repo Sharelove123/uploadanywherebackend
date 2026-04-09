@@ -13,6 +13,9 @@ python manage.py migrate_schemas --noinput
 # 12. Create Public Tenant if it doesn't exist
 python create_tenants.py
 
+# Seed subscription plans in public schema from environment variables
+python manage.py seed_subscription_plans
+
 # Make start script executable
 chmod +x start_combined.sh
 
