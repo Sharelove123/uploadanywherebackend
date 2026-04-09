@@ -54,8 +54,9 @@ class Client(TenantMixin):
     created_at = models.DateTimeField(auto_now_add=True)
     is_active = models.BooleanField(default=True)
     
-    # Auto-create schema
-    auto_create_schema = True
+    # Schema creation is deferred to a background task to avoid running
+    # tenant migrations inside a web request.
+    auto_create_schema = False
 
     def __str__(self):
         return f"{self.name} ({self.get_tenant_type_display()})"

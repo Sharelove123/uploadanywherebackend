@@ -27,6 +27,7 @@ def create_tenants():
         print("Creating Test Tenant...")
         test_tenant = Client(schema_name='test', name='Test Company', tenant_type='company')
         test_tenant.save()
+        test_tenant.create_schema(check_if_exists=True, verbosity=1)
         
         domain = Domain()
         domain.domain = 'test.localhost'

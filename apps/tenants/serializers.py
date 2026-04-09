@@ -1,7 +1,7 @@
 from rest_framework import serializers
-from django.contrib.auth import get_user_model
-from django_tenants.utils import schema_context
+from django.db import transaction
 from .models import Client, Domain
+from .tasks import provision_tenant
 
 class ClientSerializer(serializers.ModelSerializer):
     domain_url = serializers.CharField(write_only=True)
@@ -28,7 +28,7 @@ class ClientSerializer(serializers.ModelSerializer):
         if not schema_name or len(schema_name) < 1:
             schema_name = f"tenant_{validated_data.get('name', 'default')[:10].lower().replace(' ', '')}"
         
-        # 1. Create Client (Tenant) with explicit schema_name
+        # 1. Create Client (Tenant) without provisioning the schema inline.
         client = Client.objects.create(
             schema_name=schema_name,
             **validated_data
@@ -37,23 +37,21 @@ class ClientSerializer(serializers.ModelSerializer):
         # 2. Create Domain
         Domain.objects.create(domain=domain_url, tenant=client, is_primary=True)
         
-        # 3. Create Admin User INSIDE the tenant schema
-        with schema_context(client.schema_name):
-            User = get_user_model()
-            user = User.objects.create_user(
-                email=owner_email,
-                username=owner_username,
-                password=password,
-                is_staff=True,        # Can access admin
-                is_superuser=True,    # Full permissions
-                is_tenant_admin=True  # Custom flag if you have it
-            )
-
-        # 4. Create UserTenantMap in PUBLIC schema
+        # 3. Create UserTenantMap in PUBLIC schema
         from .models import UserTenantMap
         UserTenantMap.objects.create(
             email=owner_email,
             tenant=client
+        )
+
+        # 4. Provision the tenant schema and admin user asynchronously.
+        transaction.on_commit(
+            lambda: provision_tenant.delay(
+                client.id,
+                owner_email,
+                owner_username,
+                password,
+            )
         )
         
         return client
