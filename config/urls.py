@@ -28,6 +28,7 @@ def api_root(request):
                 'password_change': '/api/auth/password/change/',
                 'token_refresh': '/api/auth/token/refresh/',
             },
+            'tenants': '/api/tenants/',
             'users': '/api/users/',
             'repurposer': '/api/repurposer/',
             'social_accounts': '/api/social/',
@@ -51,6 +52,7 @@ urlpatterns = [
     path('api/auth/', include('dj_rest_auth.urls')),
     
     # App URLs
+    path('api/tenants/', include('apps.tenants.urls')),
     path('api/users/', include('apps.users.urls', namespace='users')),
     path('api/repurposer/', include('apps.repurposer.urls', namespace='repurposer')),
     path('api/social/', include('apps.social_accounts.urls', namespace='social_accounts')),
