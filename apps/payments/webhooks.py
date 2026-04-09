@@ -11,19 +11,23 @@ from .models import PaymentHistory, SubscriptionPlan
 logger = logging.getLogger(__name__)
 
 
-def _as_plain_dict(value):
-    if hasattr(value, "to_dict_recursive"):
-        return value.to_dict_recursive()
-    return value
+def _field(value, key, default=None):
+    if value is None:
+        return default
+    if isinstance(value, dict):
+        return value.get(key, default)
+    try:
+        return value[key]
+    except Exception:
+        return getattr(value, key, default)
 
 
 def _get_session_email(session):
-    session = _as_plain_dict(session)
-    customer_details = session.get('customer_details') or {}
+    customer_details = _field(session, 'customer_details', {}) or {}
     return (
-        customer_details.get('email')
-        or session.get('customer_email')
-        or (session.get('metadata') or {}).get('user_email')
+        _field(customer_details, 'email')
+        or _field(session, 'customer_email')
+        or _field(_field(session, 'metadata', {}) or {}, 'user_email')
     )
 
 @csrf_exempt
@@ -59,15 +63,15 @@ def stripe_webhook(request):
     logger.info(f"Processing event type: {event['type']}")
     if event['type'] == 'checkout.session.completed':
         session = event['data']['object']
-        logger.info(f"Handling checkout session: {session.get('id')}")
+        logger.info(f"Handling checkout session: {_field(session, 'id')}")
         handle_checkout_session(session)
     elif event['type'] == 'invoice.payment_succeeded':
         invoice = event['data']['object']
-        logger.info(f"Handling invoice payment: {invoice.get('id')}")
+        logger.info(f"Handling invoice payment: {_field(invoice, 'id')}")
         handle_invoice_payment_succeeded(invoice)
     elif event['type'] == 'customer.subscription.deleted':
         subscription = event['data']['object']
-        logger.info(f"Handling subscription deleted: {subscription.get('id')}")
+        logger.info(f"Handling subscription deleted: {_field(subscription, 'id')}")
         handle_subscription_deleted(subscription)
     else:
         logger.info(f"Unhandled event type: {event['type']}")
@@ -76,7 +80,7 @@ def stripe_webhook(request):
     return HttpResponse(status=200)
 
 def handle_subscription_deleted(subscription):
-    stripe_customer_id = subscription.get('customer')
+    stripe_customer_id = _field(subscription, 'customer')
     User = get_user_model()
     from django_tenants.utils import get_tenant_model, schema_context
     Tenant = get_tenant_model()
@@ -106,7 +110,7 @@ def handle_subscription_deleted(subscription):
 
 def handle_invoice_payment_succeeded(invoice):
     """Reset usage on successful plan renewal/payment."""
-    stripe_customer_id = invoice.get('customer')
+    stripe_customer_id = _field(invoice, 'customer')
     # Use subscription ID to verify if needed, but simple payment success is enough for reset
     
     User = get_user_model()
@@ -141,11 +145,10 @@ def handle_invoice_payment_succeeded(invoice):
             logger.error(f"{tenant.schema_name}: Failed to reset usage: {str(e)}")
 
 def handle_checkout_session(session):
-    session = _as_plain_dict(session)
-    client_reference_id = session.get('client_reference_id')
-    stripe_customer_id = session.get('customer')
-    stripe_subscription_id = session.get('subscription')
-    metadata = session.get('metadata', {})
+    client_reference_id = _field(session, 'client_reference_id')
+    stripe_customer_id = _field(session, 'customer')
+    stripe_subscription_id = _field(session, 'subscription')
+    metadata = _field(session, 'metadata', {}) or {}
     user_email = _get_session_email(session)
     
     User = get_user_model()
@@ -174,7 +177,7 @@ def handle_checkout_session(session):
                 user = User.objects.filter(email=user_email).first()
 
             if not user:
-                logger.info("Public: No matching shared user found for checkout session %s", session.get('id'))
+                logger.info("Public: No matching shared user found for checkout session %s", _field(session, 'id'))
             else:
                 user_email = user.email
                 user.subscription_tier = plan.name
@@ -197,19 +200,19 @@ def handle_checkout_session(session):
                     logger.info(f"Public: Updated tenant {tenant.schema_name} plan to {plan.name}")
 
                 # Log payment
-                payment_ref = session.get('payment_intent') or session.get('id')
+                payment_ref = _field(session, 'payment_intent') or _field(session, 'id')
                 PaymentHistory.objects.update_or_create(
                     stripe_payment_intent_id=payment_ref,
                     defaults={
                         'user': user,
                         'plan': plan,
-                        'amount': session.get('amount_total', 0) / 100.0,
+                        'amount': _field(session, 'amount_total', 0) / 100.0,
                         'status': 'succeeded',
                     }
                 )
                 logger.info(f"Public: Subscription activated for user {user.username}")
     except Exception as e:
-        logger.error(f"Public: Failed to sync shared user for checkout session {session.get('id')}: {str(e)}")
+        logger.error(f"Public: Failed to sync shared user for checkout session {_field(session, 'id')}: {str(e)}")
 
     # 2. Update in All Tenants
     tenants = Tenant.objects.exclude(schema_name='public')

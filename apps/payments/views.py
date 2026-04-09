@@ -11,6 +11,17 @@ from .models import SubscriptionPlan
 logger = logging.getLogger(__name__)
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
+
+def _field(value, key, default=None):
+    if value is None:
+        return default
+    if isinstance(value, dict):
+        return value.get(key, default)
+    try:
+        return value[key]
+    except Exception:
+        return getattr(value, key, default)
+
 class CreateCheckoutSessionView(views.APIView):
     """
     Creates a Stripe Checkout Session for a subscription.
@@ -96,16 +107,15 @@ class VerifyCheckoutSessionView(views.APIView):
 
         try:
             session = stripe.checkout.Session.retrieve(session_id)
-            session_data = session.to_dict_recursive() if hasattr(session, "to_dict_recursive") else session
 
-            if str(session_data.get('client_reference_id')) != str(request.user.id):
+            if str(_field(session, 'client_reference_id')) != str(request.user.id):
                 return Response({'error': 'Checkout session does not belong to this user'}, status=status.HTTP_403_FORBIDDEN)
 
-            if session_data.get('payment_status') not in ('paid', 'no_payment_required'):
+            if _field(session, 'payment_status') not in ('paid', 'no_payment_required'):
                 return Response({'error': 'Checkout session is not paid yet'}, status=status.HTTP_400_BAD_REQUEST)
 
             from .webhooks import handle_checkout_session
-            handle_checkout_session(session_data)
+            handle_checkout_session(session)
 
             from django_tenants.utils import schema_context
             with schema_context(request.tenant.schema_name):
