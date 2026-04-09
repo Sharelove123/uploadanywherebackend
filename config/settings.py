@@ -21,6 +21,10 @@ PORT = os.environ.get('PORT', '8000')
 FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
 
 
+def _split_env_list(value):
+    return [item.strip() for item in value.split(',') if item.strip()]
+
+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
@@ -200,13 +204,16 @@ CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOW_CREDENTIALS = True
 
 if os.environ.get('CORS_ALLOWED_ORIGINS'):
-    CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS').split(',')
+    CORS_ALLOWED_ORIGINS = _split_env_list(os.environ.get('CORS_ALLOWED_ORIGINS'))
 else:
     CORS_ALLOWED_ORIGINS = [
         'http://localhost:3000',
         'http://127.0.0.1:3000',
         'http://lvh.me:3000',
     ]
+
+if FRONTEND_URL not in CORS_ALLOWED_ORIGINS:
+    CORS_ALLOWED_ORIGINS.append(FRONTEND_URL)
 
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r'^http://.*\.localhost:3000$',
@@ -229,8 +236,10 @@ CORS_ALLOW_HEADERS = [
 ]
 
 # CSRF Settings
-if os.environ.get('CORS_ALLOWED_ORIGINS'):
-    CSRF_TRUSTED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS').split(',')
+if os.environ.get('CSRF_TRUSTED_ORIGINS'):
+    CSRF_TRUSTED_ORIGINS = _split_env_list(os.environ.get('CSRF_TRUSTED_ORIGINS'))
+elif os.environ.get('CORS_ALLOWED_ORIGINS'):
+    CSRF_TRUSTED_ORIGINS = _split_env_list(os.environ.get('CORS_ALLOWED_ORIGINS'))
 else:
     CSRF_TRUSTED_ORIGINS = [
         'http://localhost:3000',
@@ -239,6 +248,13 @@ else:
         'http://*.lvh.me:3000',
         'http://lvh.me:3000',
     ]
+
+if FRONTEND_URL not in CSRF_TRUSTED_ORIGINS:
+    CSRF_TRUSTED_ORIGINS.append(FRONTEND_URL)
+
+for trusted_origin in ['https://*.vercel.app', 'https://*.onrender.com']:
+    if trusted_origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(trusted_origin)
 CSRF_COOKIE_SAMESITE = 'None'
 CSRF_COOKIE_HTTPONLY = False  # Allow JS to read for AJAX
 CSRF_COOKIE_SECURE = True
