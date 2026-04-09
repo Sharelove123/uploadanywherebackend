@@ -65,7 +65,7 @@ class CreateCheckoutSessionView(views.APIView):
                     },
                 ],
                 mode='subscription',
-                success_url=origin + '/dashboard/subscription?success=true',
+                success_url=origin + '/dashboard/subscription?success=true&session_id={CHECKOUT_SESSION_ID}',
                 cancel_url=origin + '/dashboard/subscription?canceled=true',
                 metadata={
                     'user_id': request.user.id,
@@ -79,6 +79,42 @@ class CreateCheckoutSessionView(views.APIView):
              return Response({'error': 'Plan not found'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             logger.error(f"Stripe Checkout Error: {str(e)}")
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class VerifyCheckoutSessionView(views.APIView):
+    """
+    Verify a completed Stripe Checkout Session and sync the user's plan immediately.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        session_id = request.data.get('session_id')
+        if not session_id:
+            return Response({'error': 'session_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            session = stripe.checkout.Session.retrieve(session_id)
+
+            if str(session.get('client_reference_id')) != str(request.user.id):
+                return Response({'error': 'Checkout session does not belong to this user'}, status=status.HTTP_403_FORBIDDEN)
+
+            if session.get('payment_status') not in ('paid', 'no_payment_required'):
+                return Response({'error': 'Checkout session is not paid yet'}, status=status.HTTP_400_BAD_REQUEST)
+
+            from .webhooks import handle_checkout_session
+            handle_checkout_session(session)
+
+            from django_tenants.utils import schema_context
+            with schema_context(request.tenant.schema_name):
+                request.user.refresh_from_db()
+
+            return Response({
+                'message': 'Checkout session verified successfully.',
+                'subscription_tier': request.user.subscription_tier,
+            })
+        except stripe.error.StripeError as e:
+            logger.error(f"Stripe checkout verification error: {str(e)}")
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 class SubscriptionPlansView(views.APIView):

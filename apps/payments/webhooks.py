@@ -174,12 +174,15 @@ def handle_checkout_session(session):
                 logger.info(f"Public: Updated tenant {tenant.schema_name} plan to {plan.name}")
 
             # Log payment
-            PaymentHistory.objects.create(
-                user=user,
-                plan=plan,
-                amount=session.get('amount_total', 0) / 100.0,
-                status='succeeded',
-                stripe_payment_intent_id=session.get('payment_intent') or session.get('id')
+            payment_ref = session.get('payment_intent') or session.get('id')
+            PaymentHistory.objects.update_or_create(
+                stripe_payment_intent_id=payment_ref,
+                defaults={
+                    'user': user,
+                    'plan': plan,
+                    'amount': session.get('amount_total', 0) / 100.0,
+                    'status': 'succeeded',
+                }
             )
             logger.info(f"Public: Subscription activated for user {user.username}")
     except User.DoesNotExist:
