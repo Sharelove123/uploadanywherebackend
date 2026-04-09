@@ -69,6 +69,7 @@ class CreateCheckoutSessionView(views.APIView):
                 cancel_url=origin + '/dashboard/subscription?canceled=true',
                 metadata={
                     'user_id': request.user.id,
+                    'user_email': request.user.email,
                     'plan_id': plan.id, # Always pass internal ID
                 }
             )

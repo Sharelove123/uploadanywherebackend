@@ -10,6 +10,15 @@ from .models import PaymentHistory, SubscriptionPlan
 
 logger = logging.getLogger(__name__)
 
+
+def _get_session_email(session):
+    customer_details = session.get('customer_details') or {}
+    return (
+        customer_details.get('email')
+        or session.get('customer_email')
+        or (session.get('metadata') or {}).get('user_email')
+    )
+
 @csrf_exempt
 def stripe_webhook(request):
     logger.info("--- STRIPE WEBHOOK RECEIVED ---")
@@ -129,6 +138,7 @@ def handle_checkout_session(session):
     stripe_customer_id = session.get('customer')
     stripe_subscription_id = session.get('subscription')
     metadata = session.get('metadata', {})
+    user_email = _get_session_email(session)
     
     User = get_user_model()
     from django_tenants.utils import get_tenant_model, schema_context
@@ -148,46 +158,50 @@ def handle_checkout_session(session):
     if not plan:
         return # Cannot proceed properly without plan
 
-    # 1. Update in Public
-    user_email = None
+    # 1. Update in Public if a shared user exists there
     try:
         with schema_context('public'):
-            user = User.objects.get(id=client_reference_id)
-            user_email = user.email
-            user.subscription_tier = plan.name
-            user.stripe_customer_id = stripe_customer_id
-            if stripe_subscription_id:
-                user.stripe_subscription_id = stripe_subscription_id
-            user.save()
-            
-            # Update the Tenant (Client) Model
-            # This is critical because the tenant model is often the source of truth for features
-            from apps.tenants.models import UserTenantMap
-            tenant_map = UserTenantMap.objects.filter(email=user.email).first()
-            if tenant_map:
-                tenant = tenant_map.tenant
-                tenant.plan = plan
-                tenant.stripe_customer_id = stripe_customer_id
-                if stripe_subscription_id:
-                    tenant.stripe_subscription_id = stripe_subscription_id
-                tenant.save()
-                logger.info(f"Public: Updated tenant {tenant.schema_name} plan to {plan.name}")
+            user = User.objects.filter(id=client_reference_id).first()
+            if not user and user_email:
+                user = User.objects.filter(email=user_email).first()
 
-            # Log payment
-            payment_ref = session.get('payment_intent') or session.get('id')
-            PaymentHistory.objects.update_or_create(
-                stripe_payment_intent_id=payment_ref,
-                defaults={
-                    'user': user,
-                    'plan': plan,
-                    'amount': session.get('amount_total', 0) / 100.0,
-                    'status': 'succeeded',
-                }
-            )
-            logger.info(f"Public: Subscription activated for user {user.username}")
-    except User.DoesNotExist:
-        logger.warning(f"Public: User {client_reference_id} not found")
-        return # If user not in public, can't sync email
+            if not user:
+                logger.info("Public: No matching shared user found for checkout session %s", session.get('id'))
+            else:
+                user_email = user.email
+                user.subscription_tier = plan.name
+                user.stripe_customer_id = stripe_customer_id
+                if stripe_subscription_id:
+                    user.stripe_subscription_id = stripe_subscription_id
+                user.save()
+                
+                # Update the Tenant (Client) Model
+                # This is critical because the tenant model is often the source of truth for features
+                from apps.tenants.models import UserTenantMap
+                tenant_map = UserTenantMap.objects.filter(email=user.email).first()
+                if tenant_map:
+                    tenant = tenant_map.tenant
+                    tenant.plan = plan
+                    tenant.stripe_customer_id = stripe_customer_id
+                    if stripe_subscription_id:
+                        tenant.stripe_subscription_id = stripe_subscription_id
+                    tenant.save()
+                    logger.info(f"Public: Updated tenant {tenant.schema_name} plan to {plan.name}")
+
+                # Log payment
+                payment_ref = session.get('payment_intent') or session.get('id')
+                PaymentHistory.objects.update_or_create(
+                    stripe_payment_intent_id=payment_ref,
+                    defaults={
+                        'user': user,
+                        'plan': plan,
+                        'amount': session.get('amount_total', 0) / 100.0,
+                        'status': 'succeeded',
+                    }
+                )
+                logger.info(f"Public: Subscription activated for user {user.username}")
+    except Exception as e:
+        logger.error(f"Public: Failed to sync shared user for checkout session {session.get('id')}: {str(e)}")
 
     # 2. Update in All Tenants
     tenants = Tenant.objects.exclude(schema_name='public')
@@ -209,6 +223,13 @@ def handle_checkout_session(session):
                 if stripe_subscription_id:
                     user.stripe_subscription_id = stripe_subscription_id
                 user.save()
+
+                if tenant.plan_id != plan.id:
+                    tenant.plan = plan
+                    tenant.stripe_customer_id = stripe_customer_id
+                    if stripe_subscription_id:
+                        tenant.stripe_subscription_id = stripe_subscription_id
+                    tenant.save()
                 logger.info(f"{tenant.schema_name}: Subscription activated for user {user.username}")
         except Exception as e:
             logger.error(f"{tenant.schema_name}: Failed to update subscription: {str(e)}")
