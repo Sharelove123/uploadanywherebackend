@@ -149,12 +149,6 @@ def handle_checkout_session(session):
     stripe_customer_id = _field(session, 'customer')
     stripe_subscription_id = _field(session, 'subscription')
     metadata = _field(session, 'metadata', {}) or {}
-    # Convert Stripe object to dict if necessary
-    if not isinstance(metadata, dict):
-        try:
-            metadata = dict(metadata)
-        except (TypeError, ValueError):
-            metadata = {}
     user_email = _get_session_email(session)
     
     User = get_user_model()
@@ -163,7 +157,7 @@ def handle_checkout_session(session):
 
     # We need to update this user in EVERY schema where they exist
     # First, get the plan (it's shared/public)
-    plan_id = metadata.get('plan_id')
+    plan_id = _field(metadata, 'plan_id')
     plan = None
     if plan_id:
         with schema_context('public'):
